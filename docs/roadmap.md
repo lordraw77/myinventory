@@ -51,16 +51,16 @@ services and renders a usable map.
 
 ---
 
-## Milestone 2 — Virtualization (`v0.3`) — *headline feature*
+## Milestone 2 — Virtualization (`v0.3`) — *headline feature* ☑
 
 Enumerate VMs and link them to their hypervisor.
 
-- ☐ `VirtualizationBackend` lifecycle finalized (connect → collect → close).
-- ☐ Proxmox VE backend (`proxmoxer`): nodes, VMs/LXC, status, resources, IPs.
-- ☐ libvirt backend (KVM/QEMU): domains, state, resources, guest IPs via agent.
-- ☐ VMware backend (`pyvmomi`): vCenter + standalone ESXi, VMs, resource pools.
-- ☐ Correlation: VM IPs ↔ discovered hosts; hypervisor mgmt IP ↔ host node.
-- ☐ D2 hypervisor map showing host containers with nested VM nodes.
+- ☑ `VirtualizationBackend` lifecycle finalized (connect → collect → close).
+- ☑ Proxmox VE backend (`proxmoxer`): nodes, VMs/LXC, status, resources, IPs.
+- ☑ libvirt backend (KVM/QEMU): domains, state, resources, guest IPs via agent.
+- ☑ VMware backend (`pyvmomi`): vCenter + standalone ESXi, VMs, resource pools.
+- ☑ Correlation: VM IPs ↔ discovered hosts; hypervisor mgmt IP ↔ host node.
+- ☑ D2 hypervisor map showing host containers with nested VM nodes.
 
 **Exit criteria:** a Proxmox/ESXi node in config produces a map where the host
 box contains its running VMs, cross-linked to network discovery.

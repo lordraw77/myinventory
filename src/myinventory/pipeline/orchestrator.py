@@ -19,7 +19,7 @@ from dataclasses import dataclass, field
 
 from ..config import AppConfig, HypervisorTarget, NetworkTarget
 from ..discovery import DiscoveryResult, get_discovery
-from ..models import Inventory, Network
+from ..models import HostRole, Inventory, Network
 from ..services import get_probe
 from ..virtualization import BackendResult, get_backend
 
@@ -113,7 +113,15 @@ class Orchestrator:
     # --- stage 4: correlation --------------------------------------------
     @staticmethod
     def _correlate(inventory: Inventory) -> None:
-        """Link each VM to a network-discovered host sharing one of its IPs."""
+        """Cross-link the virtualization view with network discovery.
+
+        * **VM IP ↔ host**: a VM whose guest IP matches a discovered host is
+          linked to it; that host learns which hypervisor it runs on and is
+          re-classified as a VM (unless it already has a stronger role).
+        * **Hypervisor mgmt IP ↔ host node**: handled upstream — the hypervisor
+          host is upserted under the same IP-derived ID as the discovered node,
+          so the two records merge automatically.
+        """
         ip_to_host = {
             addr: host for host in inventory.hosts.values() for addr in host.addresses
         }
@@ -123,4 +131,6 @@ class Orchestrator:
                 if host is not None:
                     vm.host_id = host.id
                     host.hypervisor_id = vm.hypervisor_id
+                    if host.role in (HostRole.UNKNOWN, HostRole.PHYSICAL):
+                        host.role = HostRole.VM
                     break

@@ -85,6 +85,7 @@ class D2Renderer:
         if not hypervisors:
             return "# No hypervisors discovered.\n"
 
+        edges: list[str] = []
         for hyper in hypervisors:
             hid = _safe_id(hyper.id)
             label = hyper.hostname or hyper.primary_address or hyper.id
@@ -93,8 +94,22 @@ class D2Renderer:
             for vm in inv.vms_of(hyper.id):
                 vid = _safe_id(vm.id)
                 state = "▶" if vm.power_state.value == "running" else "⏹"
-                lines.append(f'  {vid}: "{state} {vm.name}" {{shape: rectangle}}')
+                ip = f"\\n{vm.addresses[0]}" if vm.addresses else ""
+                lines.append(
+                    f'  {vid}: "{state} {vm.name}{ip}" {{shape: rectangle}}'
+                )
+                # A VM correlated to a network-discovered host gets a cross-link
+                # so the map shows the guest is also seen on the network.
+                if vm.host_id and vm.host_id in inv.hosts:
+                    edges.append(
+                        f'{hid}.{vid} -> {_safe_id(vm.host_id)}: "on network"'
+                    )
             lines.append("}")
+            lines.append("")
+
+        if edges:
+            lines.append("# VM ↔ network-discovered host cross-links")
+            lines.extend(edges)
             lines.append("")
         return "\n".join(lines).rstrip() + "\n"
 

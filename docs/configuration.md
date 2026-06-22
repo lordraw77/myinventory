@@ -87,6 +87,31 @@ hypervisors:
 A target with neither a complete token nor a password is a clear run-time error
 naming the host.
 
+**VMware (vCenter or standalone ESXi)** — `username` + `password`, against the
+vCenter Server or an ESXi host directly. A read-only vSphere role is enough. Both
+hosts and VMs are enumerated; each VM is linked to the ESXi host running it.
+
+```yaml
+- type: vmware
+  host: vcenter.lab.local        # or a standalone ESXi IP
+  username: readonly@vsphere.local
+  password: env:VSPHERE_PASSWORD
+  verify_tls: false              # accept self-signed homelab certs
+```
+
+**libvirt (KVM/QEMU)** — `host` is a libvirt **connection URI**, not an IP. The
+daemon is opened read-only. Guest IPs come from the qemu-guest-agent when it is
+running in the VM.
+
+```yaml
+- type: libvirt
+  host: qemu+ssh://root@192.168.1.30/system   # remote over SSH
+# host: qemu:///system                        # local daemon
+```
+
+Guest IP/MAC discovery is best-effort across all backends: a VM whose guest agent
+(QEMU agent / VMware Tools) is absent still appears, just without addresses.
+
 ## `linux_ssh[]`
 
 Linux hosts to inspect read-only over SSH (deep inspection — OS, packages,
