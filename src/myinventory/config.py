@@ -128,6 +128,21 @@ class EnrichmentConfig:
 
 
 @dataclass
+class StorageConfig:
+    """Where and how the inventory is persisted (Milestone 5).
+
+    ``backend`` selects ``json`` (an ``inventory.json`` plus a ``history/``
+    directory) or ``sqlite`` (a single ``inventory.db``). ``keep_history``
+    records a per-scan snapshot for change tracking; ``stale_after_scans`` is the
+    number of consecutive scans a host may be missing before it is flagged stale.
+    """
+
+    backend: str = "json"  # "json" | "sqlite"
+    keep_history: bool = True
+    stale_after_scans: int = 3
+
+
+@dataclass
 class AppConfig:
     """Top-level configuration."""
 
@@ -136,6 +151,7 @@ class AppConfig:
     linux_ssh: list[LinuxSshTarget] = field(default_factory=list)
     service_probes: list[str] = field(default_factory=lambda: ["banner"])
     enrichment: EnrichmentConfig = field(default_factory=EnrichmentConfig)
+    storage: StorageConfig = field(default_factory=StorageConfig)
     workers: int = 64
     output_dir: str = "./out"
 
@@ -158,6 +174,7 @@ class AppConfig:
             linux_ssh=linux_ssh,
             service_probes=data.get("service_probes", ["banner"]),
             enrichment=_enrichment(data.get("enrichment", {})),
+            storage=_storage(data.get("storage", {})),
             workers=int(data.get("workers", 64)),
             output_dir=data.get("output_dir", "./out"),
         )
@@ -224,6 +241,19 @@ def _enrichment(data: dict[str, Any]) -> EnrichmentConfig:
         classify=bool(data.get("classify", True)),
         snmp=_snmp(data.get("snmp", {})),
         rules=[_rule(r) for r in data.get("rules", [])],
+    )
+
+
+def _storage(data: dict[str, Any]) -> StorageConfig:
+    if not isinstance(data, dict):
+        raise ConfigError("'storage' must be a mapping")
+    backend = str(data.get("backend", "json"))
+    if backend not in ("json", "sqlite"):
+        raise ConfigError(f"unsupported storage backend {backend!r}; use 'json' or 'sqlite'")
+    return StorageConfig(
+        backend=backend,
+        keep_history=bool(data.get("keep_history", True)),
+        stale_after_scans=int(data.get("stale_after_scans", 3)),
     )
 
 

@@ -7,14 +7,21 @@ can re-render anytime without touching the network.
 ```
 out/
 ├── inventory.json          # the normalized model (source of truth)
+├── history/                # one raw snapshot per scan (change tracking)
+│   └── <timestamp>.json
 ├── diagrams/
 │   ├── network.d2          # all subnets, each a container of hosts
 │   ├── hypervisors.d2      # each hypervisor containing its VMs
 │   └── subnet-<name>.d2    # one focused diagram per subnet
 └── docs/
     ├── index.md            # summary + subnet tables + VM overview
+    ├── changelog.md        # what changed between scans, newest first
     └── hosts/<id>.md       # one page per host
 ```
+
+With `storage.backend: sqlite` the cumulative state and the snapshot history live
+in a single `out/inventory.db` instead of `inventory.json` + `history/`; the
+rendered `diagrams/` and `docs/` are identical.
 
 ## D2 diagrams
 
@@ -55,6 +62,9 @@ static-site generator (MkDocs, Hugo, Docusaurus).
   services), and a per-hypervisor VM table.
 - **`hosts/<id>.md`** — a fact table, the service list, any hosted VMs, and a
   link to the hypervisor when the host is a guest.
+- **`changelog.md`** — the snapshot history rendered newest-first, one section
+  per scan: hosts added/removed/changed, service drift and VM changes. Generated
+  from `history/` (or the SQLite `snapshots` table) and linked from `index.md`.
 
 Links between pages are relative, so the `docs/` tree is self-contained and
 portable.

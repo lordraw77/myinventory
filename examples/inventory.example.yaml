@@ -120,3 +120,12 @@ enrichment:
   #     tags: [camera, iot]
   #   - vendor_contains: synology
   #     role: nas
+
+# --- persistence & change tracking (Milestone 5) ---------------------------
+# How the inventory is stored and how scans are tracked over time. Each scan is
+# snapshotted before it merges into the cumulative state, powering `diff`, the
+# changelog page and `list --stale`.
+storage:
+  backend: json              # json (inventory.json + history/) | sqlite (inventory.db)
+  keep_history: true         # record a per-scan snapshot
+  stale_after_scans: 3       # default N for `myinventory list --stale`

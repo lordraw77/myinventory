@@ -16,10 +16,11 @@ pip install -e ".[all]"    # everything
 ## Commands
 
 ```
-myinventory scan             -c CONFIG [-o OUT]   discover + persist inventory.json
+myinventory scan             -c CONFIG [-o OUT]   discover + persist the inventory
 myinventory render           [-i IN] [-o OUT]     write D2 diagrams + Markdown docs
 myinventory report           -c CONFIG [-o OUT]   scan, then render (one shot)
-myinventory list             [-i IN]              text summary of a stored inventory
+myinventory list             [-i IN] [--stale N]  text summary of a stored inventory
+myinventory diff             [-i IN] [--from ID] [--to ID] [A B] [--json]
 myinventory validate-config  -c CONFIG            check a config without scanning
 ```
 
@@ -41,12 +42,37 @@ d2 out/diagrams/network.d2 out/network.svg
 
 ### Re-scan and diff
 
-Because IDs are stable and scans **merge**, re-running updates the same records:
+Because IDs are stable and scans **merge**, re-running updates the same records.
+Each scan is also snapshotted under `out/history/` (or the SQLite `snapshots`
+table) *before* the merge, so change tracking can see removals and drift:
 
 ```bash
 myinventory scan -c myinventory.yaml -o ./out
-git diff out/inventory.json          # see exactly what changed
+myinventory diff -o ./out            # what changed between the last two scans
+git diff out/inventory.json          # or just eyeball the cumulative JSON
 ```
+
+`diff` defaults to the two most recent snapshots; point it at specific ones with
+`--from`/`--to` (snapshot ids, as listed under `out/history/`), at two arbitrary
+JSON files (`myinventory diff a.json b.json`), or add `--json` for a machine-
+readable diff. `render` turns the same snapshot history into a
+[`changelog.md`](output-formats.md) page, newest scan first.
+
+### Find hosts that have gone away
+
+```bash
+myinventory list -i ./out/inventory.json --stale 3
+```
+
+A host is **stale** when its stable ID is absent from each of the last N scans
+(default 3) — useful for spotting decommissioned machines that linger in the
+cumulative inventory.
+
+### SQLite backend
+
+Set `storage.backend: sqlite` in the config to persist to a single
+`out/inventory.db` instead of `inventory.json` + `history/`. Every command works
+the same; pass the `.db` path to `-i` for `render`/`list`/`diff`.
 
 ### Re-render only
 

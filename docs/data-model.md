@@ -120,3 +120,17 @@ The aggregate root. Key behaviors:
 The merge rule is "non-empty incoming value wins, lists are unioned, timestamps
 advance" — see `_merge_host` in
 [inventory.py](../src/myinventory/models/inventory.py).
+
+## Change tracking
+
+The merged `Inventory` is the cumulative source of truth, but it never drops a
+host, so it can't answer "what changed?" on its own. The repository therefore
+keeps a **snapshot history** — the raw `Inventory` from each scan, stored before
+the merge. The [`history/`](../src/myinventory/history) helpers are pure
+functions over those snapshots:
+
+- `diff_inventories(old, new)` → an `InventoryDiff` (hosts/VMs added, removed and
+  field/service-level changes), consumed by `myinventory diff`.
+- `build_changelog(snapshots)` → the `changelog.md` page.
+- `stale_hosts(inventory, snapshots, scans=N)` → hosts absent from the last N
+  scans, surfaced by `myinventory list --stale`.

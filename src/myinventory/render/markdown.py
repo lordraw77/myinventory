@@ -22,19 +22,28 @@ def _slug(raw: str) -> str:
 
 
 class MarkdownRenderer:
-    def render(self, inventory: Inventory, out_dir: str | Path) -> list[Path]:
+    def render(
+        self,
+        inventory: Inventory,
+        out_dir: str | Path,
+        *,
+        changelog: str | None = None,
+    ) -> list[Path]:
         out = Path(out_dir)
         (out / "hosts").mkdir(parents=True, exist_ok=True)
         written: list[Path] = []
 
-        written.append(self._write(out / "index.md", self._index(inventory)))
+        has_changelog = changelog is not None
+        written.append(self._write(out / "index.md", self._index(inventory, has_changelog)))
         for host in inventory.hosts.values():
             page = out / "hosts" / f"{_slug(host.id)}.md"
             written.append(self._write(page, self._host_page(inventory, host)))
+        if changelog is not None:
+            written.append(self._write(out / "changelog.md", changelog))
         return written
 
     # --- index ------------------------------------------------------------
-    def _index(self, inv: Inventory) -> str:
+    def _index(self, inv: Inventory, has_changelog: bool = False) -> str:
         lines = [
             "# Network Inventory",
             "",
@@ -52,6 +61,8 @@ class MarkdownRenderer:
             f"| Packages | {sum(len(h.packages) for h in inv.hosts.values())} |",
             "",
         ]
+        if has_changelog:
+            lines += ["See the [changelog](changelog.md) for changes between scans.", ""]
 
         for net in inv.networks:
             hosts = inv.hosts_in(net)

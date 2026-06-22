@@ -147,14 +147,30 @@ and the per-host Markdown.
 
 ---
 
-## Milestone 5 — Change tracking & reporting (`v0.6`)
+## Milestone 5 — Change tracking & reporting (`v0.6`) ☑
 
-- ☐ History: keep prior scans; compute a diff between two inventories.
-- ☐ `myinventory diff` command (new/removed hosts, changed services, drifted
-  VMs).
-- ☐ Markdown changelog page per scan.
-- ☐ Optional SQLite backend behind the existing repository interface.
-- ☐ "Stale host" detection (not seen in N scans).
+Turn a one-off census into a tracked one. Every scan is snapshotted *before* it
+is merged into the cumulative `inventory.json`, so the history records exactly
+what each scan saw — which is what makes removals and drift detectable (the
+merged state never drops a host). The change-tracking helpers live in
+[`history/`](../src/myinventory/history/) and are pure functions of the model.
+
+- ☑ History: keep prior scans (raw per-scan snapshots) behind the repository
+  interface; compute a structured diff between two inventories
+  ([`history/diff.py`](../src/myinventory/history/diff.py)).
+- ☑ `myinventory diff` command — new/removed hosts, changed fields/services and
+  drifted VMs; compares the last two snapshots, two named snapshots
+  (`--from`/`--to`) or two JSON files, with a `--json` machine form.
+- ☑ Markdown changelog page (`docs/changelog.md`): the diff history newest-first,
+  one section per scan, linked from `index.md`.
+- ☑ Optional SQLite backend (`SqliteInventoryRepository`) behind the existing
+  repository interface; selected via `storage.backend: sqlite`.
+- ☑ "Stale host" detection — hosts absent from the last N scans, surfaced by
+  `myinventory list --stale N` (`history/stale.py`).
+
+**Exit criteria:** re-scanning a changed LAN yields a `diff` of what moved, a
+changelog page per scan, and a `list --stale` flag for hosts that have gone away —
+with the same data available from either the JSON or SQLite backend.
 
 ---
 

@@ -21,6 +21,7 @@ myinventory validate-config --config myinventory.yaml
 | `hypervisors` | list | `[]` | Hypervisors to enumerate VMs from. |
 | `linux_ssh` | list | `[]` | Linux hosts to deep-inspect over SSH. |
 | `enrichment` | map | *(on)* | Post-scan enrichment passes (see below). |
+| `storage` | map | *(json)* | Persistence backend + change tracking (see below). |
 
 ## `networks[]`
 
@@ -218,6 +219,27 @@ after the built-in heuristics and, being explicit, may override the role.
 | `vendor_contains` | substring of the MAC-derived vendor. |
 | `hostname_regex` | regex search against the hostname. |
 | `role` / `tags` | outcome applied on a match. |
+
+## `storage`
+
+Where the inventory is persisted and how change tracking behaves (Milestone 5).
+
+```yaml
+storage:
+  backend: json            # json | sqlite
+  keep_history: true       # snapshot every scan for diffs/changelog/stale
+  stale_after_scans: 3     # absence threshold reported by `list --stale`
+```
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `backend` | str | `json` | `json` → `inventory.json` + `history/`; `sqlite` → `inventory.db`. |
+| `keep_history` | bool | `true` | Record a per-scan snapshot. With it off, `diff`/`changelog`/`--stale` have nothing to compare. |
+| `stale_after_scans` | int | `3` | Default N for stale-host detection. |
+
+Each scan is snapshotted **before** it merges into the cumulative state, so the
+history reflects exactly what each scan saw — the only way removals and drift are
+detectable, since the merge never drops a host.
 
 ## Secrets
 

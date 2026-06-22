@@ -1,27 +1,36 @@
 """Command-line interface.
 
 Commands:
-    scan             discover hosts/services/VMs, merge + persist inventory.json
-    render           read inventory.json, write D2 diagrams + Markdown docs
+    scan             discover hosts/services/VMs, merge + persist inventory
+    render           read the inventory, write D2 diagrams + Markdown docs
     report           scan, then render (the common one-shot workflow)
     list             print a short text summary of a stored inventory
+    diff             show what changed between two scans
     validate-config  load + check a config file without scanning
 
-A thin layer over the pipeline and renderers — no logic lives here.
+A thin layer over the pipeline, renderers and change-tracking helpers — no
+domain logic lives here.
 """
 
 from __future__ import annotations
 
 import argparse
+import json
 import sys
 from pathlib import Path
 
 from . import __version__
 from .config import AppConfig, ConfigError
+from .history import build_changelog, diff_inventories, render_diff_section, stale_hosts
 from .models import Inventory
 from .pipeline import Orchestrator
 from .render import D2Renderer, MarkdownRenderer
-from .storage import JsonInventoryRepository
+from .storage import (
+    InventoryRepository,
+    JsonInventoryRepository,
+    SqliteInventoryRepository,
+    make_repository,
+)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -47,7 +56,7 @@ def _build_parser() -> argparse.ArgumentParser:
     scan.add_argument("-o", "--out", default="./out")
     scan.set_defaults(func=_cmd_scan)
 
-    render = sub.add_parser("render", help="render diagrams + docs from inventory.json")
+    render = sub.add_parser("render", help="render diagrams + docs from the inventory")
     render.add_argument("-i", "--in", dest="inp", default="./out/inventory.json")
     render.add_argument("-o", "--out", default="./out")
     render.set_defaults(func=_cmd_render)
@@ -59,7 +68,28 @@ def _build_parser() -> argparse.ArgumentParser:
 
     lst = sub.add_parser("list", help="print a summary of a stored inventory")
     lst.add_argument("-i", "--in", dest="inp", default="./out/inventory.json")
+    lst.add_argument(
+        "--stale",
+        nargs="?",
+        type=int,
+        const=3,
+        default=None,
+        metavar="N",
+        help="also list hosts not seen in the last N scans (default N=3)",
+    )
     lst.set_defaults(func=_cmd_list)
+
+    dif = sub.add_parser("diff", help="show what changed between two scans")
+    dif.add_argument("-i", "--in", dest="inp", default="./out/inventory.json")
+    dif.add_argument("--from", dest="from_id", help="older snapshot id")
+    dif.add_argument("--to", dest="to_id", help="newer snapshot id")
+    dif.add_argument(
+        "paths",
+        nargs="*",
+        help="two inventory JSON files to compare directly (instead of history)",
+    )
+    dif.add_argument("--json", action="store_true", help="emit the diff as JSON")
+    dif.set_defaults(func=_cmd_diff)
 
     val = sub.add_parser("validate-config", help="check a config file")
     val.add_argument("-c", "--config", required=True)
@@ -68,38 +98,66 @@ def _build_parser() -> argparse.ArgumentParser:
     return p
 
 
+def _repo_for(path: str | Path) -> InventoryRepository:
+    """Pick a repository by file suffix: ``.db`` -> SQLite, else JSON."""
+    p = Path(path)
+    if p.suffix == ".db":
+        return SqliteInventoryRepository(p)
+    return JsonInventoryRepository(p)
+
+
 def _cmd_scan(args: argparse.Namespace) -> int:
     config = AppConfig.load(args.config)
     inventory, report = Orchestrator(config).scan()
-    repo = JsonInventoryRepository(Path(args.out) / "inventory.json")
-    repo.save_merged(inventory)
+    repo = make_repository(config.storage.backend, args.out)
+    repo.save_merged(inventory, keep_history=config.storage.keep_history)
     print(f"scan complete: {report}")
     for err in report.errors:
         print(f"  ! {err}", file=sys.stderr)
-    print(f"saved -> {Path(args.out) / 'inventory.json'}")
+    print(f"saved -> {args.out} ({config.storage.backend})")
     return 0
 
 
 def _cmd_render(args: argparse.Namespace) -> int:
-    inventory = Inventory.from_json(Path(args.inp).read_text())
+    repo = _repo_for(args.inp)
+    inventory = repo.load()
+    if inventory is None:
+        print(f"no inventory found at {args.inp}", file=sys.stderr)
+        return 1
     out = Path(args.out)
+    changelog = build_changelog(repo.snapshots())
     d2_files = D2Renderer().render(inventory, out / "diagrams")
-    md_files = MarkdownRenderer().render(inventory, out / "docs")
+    md_files = MarkdownRenderer().render(inventory, out / "docs", changelog=changelog)
     print(f"rendered {len(d2_files)} D2 diagrams -> {out / 'diagrams'}")
     print(f"rendered {len(md_files)} Markdown files -> {out / 'docs'}")
     return 0
 
 
 def _cmd_report(args: argparse.Namespace) -> int:
-    rc = _cmd_scan(args)
-    if rc != 0:
-        return rc
-    args.inp = str(Path(args.out) / "inventory.json")
-    return _cmd_render(args)
+    config = AppConfig.load(args.config)
+    inventory, report = Orchestrator(config).scan()
+    repo = make_repository(config.storage.backend, args.out)
+    repo.save_merged(inventory, keep_history=config.storage.keep_history)
+    print(f"scan complete: {report}")
+    for err in report.errors:
+        print(f"  ! {err}", file=sys.stderr)
+
+    merged = repo.load() or inventory
+    out = Path(args.out)
+    changelog = build_changelog(repo.snapshots())
+    d2_files = D2Renderer().render(merged, out / "diagrams")
+    md_files = MarkdownRenderer().render(merged, out / "docs", changelog=changelog)
+    print(f"rendered {len(d2_files)} D2 diagrams -> {out / 'diagrams'}")
+    print(f"rendered {len(md_files)} Markdown files -> {out / 'docs'}")
+    return 0
 
 
 def _cmd_list(args: argparse.Namespace) -> int:
-    inventory = Inventory.from_json(Path(args.inp).read_text())
+    repo = _repo_for(args.inp)
+    inventory = repo.load()
+    if inventory is None:
+        print(f"no inventory found at {args.inp}", file=sys.stderr)
+        return 1
     print(f"inventory generated {inventory.generated_at}")
     print(f"  networks:   {len(inventory.networks)}")
     print(f"  hosts:      {len(inventory.hosts)}")
@@ -111,6 +169,43 @@ def _cmd_list(args: argparse.Namespace) -> int:
         svc = ", ".join(sorted({s.name or s.key for s in host.services}))
         tags = f"  {{{', '.join(host.tags)}}}" if host.tags else ""
         print(f"  - {label:24} [{host.role.value}] {svc}{tags}")
+
+    if args.stale is not None:
+        snaps = [inv for _, inv in repo.snapshots()]
+        stale = stale_hosts(inventory, snaps, scans=args.stale)
+        print(f"\nstale (not seen in last {args.stale} scans): {len(stale)}")
+        for s in stale:
+            print(f"  - {s.label:24} last_seen={s.host.last_seen or '—'}")
+    return 0
+
+
+def _cmd_diff(args: argparse.Namespace) -> int:
+    if args.paths:
+        if len(args.paths) != 2:
+            print("diff expects exactly two file paths", file=sys.stderr)
+            return 1
+        old = Inventory.from_json(Path(args.paths[0]).read_text())
+        new = Inventory.from_json(Path(args.paths[1]).read_text())
+    else:
+        repo = _repo_for(args.inp)
+        ids = repo.snapshot_ids()
+        if len(ids) < 2 and not (args.from_id and args.to_id):
+            print("need at least two snapshots to diff", file=sys.stderr)
+            return 1
+        from_id = args.from_id or ids[-2]
+        to_id = args.to_id or ids[-1]
+        loaded_old = repo.load_snapshot(from_id)
+        loaded_new = repo.load_snapshot(to_id)
+        if loaded_old is None or loaded_new is None:
+            print("snapshot not found", file=sys.stderr)
+            return 1
+        old, new = loaded_old, loaded_new
+
+    result = diff_inventories(old, new)
+    if args.json:
+        print(json.dumps(result.to_dict(), indent=2))
+    else:
+        print(render_diff_section("diff", result))
     return 0
 
 
@@ -133,6 +228,7 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         f"{len(config.linux_ssh)} linux_ssh target(s), "
         f"probes={config.service_probes}, "
         f"enrichment={passes or ['(none)']}, "
-        f"rules={len(enr.rules)}"
+        f"rules={len(enr.rules)}, "
+        f"storage={config.storage.backend}"
     )
     return 0
