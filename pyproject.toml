@@ -1,0 +1,70 @@
+[build-system]
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "myinventory"
+version = "0.1.0"
+description = "Agentless network census: discover hosts, services and virtual machines, then render D2 maps and Markdown documentation."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [{ name = "Alessandro Pioli", email = "alessandro.pioli@gmail.com" }]
+keywords = ["network", "inventory", "discovery", "d2", "documentation", "cmdb"]
+
+# Core runtime deps are intentionally minimal. Optional discovery/virtualization
+# backends are pulled in through extras so a base install stays lightweight.
+dependencies = [
+    "pyyaml>=6.0",
+    "rich>=13.0",
+]
+
+[project.optional-dependencies]
+scan = [
+    "python-nmap>=0.7.1",   # optional wrapper around the nmap binary
+    "scapy>=2.5.0",         # optional pure-python ARP/ICMP sweeps
+]
+virt = [
+    "proxmoxer>=2.0",       # Proxmox VE API
+    "requests>=2.31",
+    "pyvmomi>=8.0",         # VMware vSphere / ESXi
+    "libvirt-python>=9.0",  # libvirt / KVM / QEMU
+]
+ssh = [
+    "paramiko>=3.0",        # agentless service inspection over SSH
+]
+dev = [
+    "pytest>=7.4",
+    "pytest-cov>=4.1",
+    "mypy>=1.7",
+    "ruff>=0.1",
+    "types-PyYAML",
+]
+all = ["myinventory[scan,virt,ssh]"]
+
+[project.scripts]
+myinventory = "myinventory.cli:main"
+
+[project.urls]
+Documentation = "https://github.com/alessandropioli/myinventory/tree/main/docs"
+Source = "https://github.com/alessandropioli/myinventory"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py39"
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B", "SIM"]
+
+[tool.mypy]
+python_version = "3.9"
+warn_unused_ignores = true
+disallow_untyped_defs = true
+packages = ["myinventory"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+addopts = "-q"

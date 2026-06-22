@@ -1,0 +1,67 @@
+# --- Python -----------------------------------------------------------------
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+
+# Packaging / build
+build/
+dist/
+*.egg-info/
+*.egg
+.eggs/
+wheels/
+pip-wheel-metadata/
+MANIFEST
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Tooling caches
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+.dmypy.json
+.tox/
+.nox/
+.cache/
+.coverage
+.coverage.*
+coverage.xml
+htmlcov/
+
+# --- Editors / IDEs ---------------------------------------------------------
+.idea/
+.vscode/
+*.swp
+*.swo
+*~
+
+# --- OS junk ----------------------------------------------------------------
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# --- myinventory: local config & scan output --------------------------------
+# These describe your network (addresses, services, VMs) — keep them out of git.
+# See docs/security.md.
+# Default output dir holds inventory.json, the .d2 sources and any rendered
+# diagrams (SVG/PNG). The test fixture under tests/fixtures/ is intentionally
+# tracked and not matched here.
+/myinventory.yaml
+*.local.yaml
+/out/
+
+# --- Secrets ----------------------------------------------------------------
+.env
+.env.*
+*.secret
+*.pem
+*.key
+id_rsa
+id_ed25519
+.claude

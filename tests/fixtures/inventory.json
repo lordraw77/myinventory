@@ -1,0 +1,60 @@
+{
+  "schema_version": 1,
+  "generated_at": "2026-06-22T00:00:00+00:00",
+  "networks": [
+    { "cidr": "192.168.1.0/24", "name": "lan", "vlan": 1, "description": null, "extra": {} }
+  ],
+  "hosts": [
+    {
+      "id": "ip:192.168.1.10",
+      "addresses": ["192.168.1.10"],
+      "hostname": "pve-1",
+      "mac": null,
+      "role": "hypervisor",
+      "os": "Proxmox VE",
+      "services": [
+        {"port": 22, "protocol": "tcp", "name": "ssh", "product": "OpenSSH", "version": "9.6p1", "state": "open", "banner": "SSH-2.0-OpenSSH_9.6p1", "source": "banner", "extra": {}},
+        {"port": 8006, "protocol": "tcp", "name": "proxmox-ve", "product": null, "version": null, "state": "open", "banner": null, "source": "banner", "extra": {}}
+      ],
+      "tags": [],
+      "sources": ["tcp", "virtualization"],
+      "hypervisor_id": null,
+      "hosted_vm_ids": ["proxmox:pve-1:101", "proxmox:pve-1:102"],
+      "first_seen": "2026-06-22T00:00:00+00:00",
+      "last_seen": "2026-06-22T00:00:00+00:00",
+      "extra": {}
+    },
+    {
+      "id": "ip:192.168.1.20",
+      "addresses": ["192.168.1.20"],
+      "hostname": "web-1",
+      "mac": null,
+      "role": "vm",
+      "os": "Debian 12",
+      "services": [
+        {"port": 80, "protocol": "tcp", "name": "http", "product": "nginx", "version": "1.25", "state": "open", "banner": "Server: nginx/1.25", "source": "banner", "extra": {}}
+      ],
+      "tags": ["web"],
+      "sources": ["tcp"],
+      "hypervisor_id": "ip:192.168.1.10",
+      "hosted_vm_ids": [],
+      "first_seen": "2026-06-22T00:00:00+00:00",
+      "last_seen": "2026-06-22T00:00:00+00:00",
+      "extra": {}
+    }
+  ],
+  "vms": [
+    {
+      "id": "proxmox:pve-1:101", "name": "web-1", "hypervisor_id": "ip:192.168.1.10",
+      "backend": "proxmox", "power_state": "running", "vcpus": 2, "memory_mb": 2048,
+      "disk_gb": 20.0, "guest_os": "Debian 12", "addresses": ["192.168.1.20"],
+      "mac_addresses": [], "host_id": "ip:192.168.1.20", "tags": [], "extra": {"kind": "qemu", "vmid": 101}
+    },
+    {
+      "id": "proxmox:pve-1:102", "name": "db-1", "hypervisor_id": "ip:192.168.1.10",
+      "backend": "proxmox", "power_state": "stopped", "vcpus": 4, "memory_mb": 8192,
+      "disk_gb": 100.0, "guest_os": "Debian 12", "addresses": [],
+      "mac_addresses": [], "host_id": null, "tags": ["db"], "extra": {"kind": "qemu", "vmid": 102}
+    }
+  ]
+}

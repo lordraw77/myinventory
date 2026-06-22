@@ -1,0 +1,79 @@
+# myinventory configuration example.
+# Copy to ./myinventory.yaml and adapt. See docs/configuration.md.
+
+# Where outputs are written (overridable with --out on the CLI).
+output_dir: ./out
+
+# Global thread-pool size for the service-probe stage.
+workers: 64
+
+# Which service probes to run, in order. "banner" is dependency-free.
+service_probes:
+  - banner
+
+# --- networks to scan ------------------------------------------------------
+networks:
+  - name: lan
+    cidr: 192.168.1.0/24
+    vlan: 1
+    discovery: [tcp]          # tcp | icmp | arp (icmp/arp need the [scan] extra)
+    timeout: 0.5              # per-connection timeout, seconds
+    workers: 128              # parallelism for this subnet's sweep
+
+  - name: dmz
+    cidr: 10.0.10.0/24
+    discovery: [tcp]
+    probe_ports: [22, 80, 443, 8006]   # restrict the liveness probe
+
+# --- hypervisors to enumerate VMs from -------------------------------------
+# Secrets use references, never inline values:
+#   env:NAME     -> read from environment variable NAME
+#   file:/path   -> read from a file
+hypervisors:
+  # Proxmox with an API token (preferred — scoped and revocable):
+  - name: pve-1
+    type: proxmox
+    host: 192.168.1.10
+    username: root@pam
+    token_name: myinventory
+    secret: env:PROXMOX_TOKEN
+    verify_tls: false
+
+  # Proxmox with password login (use this OR a token, not both):
+  # - name: pve-2
+  #   type: proxmox
+  #   host: 192.168.1.11
+  #   username: root@pam            # realm is required (e.g. @pam, @pve)
+  #   password: env:PVE2_PASSWORD
+  #   verify_tls: false
+
+  # - name: esxi-1
+  #   type: vmware
+  #   host: 192.168.1.20
+  #   username: readonly@vsphere.local
+  #   password: env:VSPHERE_PASSWORD
+  #   verify_tls: false
+
+  # - name: kvm-1
+  #   type: libvirt
+  #   host: qemu+ssh://root@192.168.1.30/system
+
+# --- Linux servers to inspect over SSH (roadmap M3) ------------------------
+# Read-only deep inspection: OS, installed packages, processes, systemd units
+# and Docker/Podman containers. Secrets use env:/file: references — never inline.
+linux_ssh:
+  - name: app-1
+    host: 192.168.1.20
+    username: ops
+    password: env:APP1_SSH_PASSWORD      # or use key_file instead
+    # key_file: ~/.ssh/id_ed25519
+    sudo: true                           # run privileged commands via sudo -S
+    sudo_password: env:APP1_SUDO_PASSWORD
+    port: 22
+
+  # Key-based login, passwordless sudo (no sudo_password needed):
+  # - name: db-1
+  #   host: 192.168.1.21
+  #   username: ansible
+  #   key_file: ~/.ssh/id_ed25519
+  #   sudo: true
