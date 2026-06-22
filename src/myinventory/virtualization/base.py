@@ -13,7 +13,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Type
+from typing import Callable
 
 from ..models import Host, VirtualMachine
 
@@ -23,10 +23,10 @@ class BackendResult:
     """What one backend run produced."""
 
     #: The hypervisor node(s) — physical hosts running the virtualization stack.
-    hosts: List[Host] = field(default_factory=list)
+    hosts: list[Host] = field(default_factory=list)
     #: The guests enumerated from those hosts.
-    vms: List[VirtualMachine] = field(default_factory=list)
-    errors: List[str] = field(default_factory=list)
+    vms: list[VirtualMachine] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 class VirtualizationBackend(ABC):
@@ -38,18 +38,18 @@ class VirtualizationBackend(ABC):
     def __init__(self, **options: object) -> None:
         self.options = options
 
-    def connect(self, target: "object") -> None:
+    def connect(self, target: object) -> None:  # noqa: B027 - optional override, default no-op
         """Open a session to ``target`` (a ``HypervisorTarget``). Optional."""
 
     @abstractmethod
-    def collect(self, target: "object") -> BackendResult:
+    def collect(self, target: object) -> BackendResult:
         """Enumerate hypervisor hosts and their VMs."""
         raise NotImplementedError
 
-    def close(self) -> None:
+    def close(self) -> None:  # noqa: B027 - optional override, default no-op
         """Release any session resources. Optional."""
 
-    def run(self, target: "object") -> BackendResult:
+    def run(self, target: object) -> BackendResult:
         """Convenience wrapper: connect → collect → close, errors captured."""
         try:
             self.connect(target)
@@ -61,13 +61,13 @@ class VirtualizationBackend(ABC):
 
 
 # --- registry -------------------------------------------------------------
-_REGISTRY: Dict[str, Type[VirtualizationBackend]] = {}
+_REGISTRY: dict[str, type[VirtualizationBackend]] = {}
 
 
 def register_backend(
     name: str,
-) -> Callable[[Type[VirtualizationBackend]], Type[VirtualizationBackend]]:
-    def _decorator(cls: Type[VirtualizationBackend]) -> Type[VirtualizationBackend]:
+) -> Callable[[type[VirtualizationBackend]], type[VirtualizationBackend]]:
+    def _decorator(cls: type[VirtualizationBackend]) -> type[VirtualizationBackend]:
         cls.name = name
         _REGISTRY[name] = cls
         return cls
@@ -83,5 +83,5 @@ def get_backend(name: str, **options: object) -> VirtualizationBackend:
     return _REGISTRY[name](**options)
 
 
-def available() -> List[str]:
+def available() -> list[str]:
     return sorted(_REGISTRY)

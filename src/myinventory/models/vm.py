@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 
 class PowerState(str, Enum):
@@ -29,20 +29,20 @@ class VirtualMachine:
     backend: str  # "proxmox" | "vmware" | "libvirt" | ...
     power_state: PowerState = PowerState.UNKNOWN
 
-    vcpus: Optional[int] = None
-    memory_mb: Optional[int] = None
-    disk_gb: Optional[float] = None
-    guest_os: Optional[str] = None
-    addresses: List[str] = field(default_factory=list)
-    mac_addresses: List[str] = field(default_factory=list)
+    vcpus: int | None = None
+    memory_mb: int | None = None
+    disk_gb: float | None = None
+    guest_os: str | None = None
+    addresses: list[str] = field(default_factory=list)
+    mac_addresses: list[str] = field(default_factory=list)
 
     # Set by correlation when the guest matches a network-discovered host.
-    host_id: Optional[str] = None
+    host_id: str | None = None
 
-    tags: List[str] = field(default_factory=list)
-    extra: Dict[str, Any] = field(default_factory=dict)
+    tags: list[str] = field(default_factory=list)
+    extra: dict[str, Any] = field(default_factory=dict)
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "name": self.name,
@@ -61,7 +61,7 @@ class VirtualMachine:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "VirtualMachine":
+    def from_dict(cls, data: dict[str, Any]) -> VirtualMachine:
         return cls(
             id=data["id"],
             name=data["name"],

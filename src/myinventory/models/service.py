@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 @dataclass
@@ -17,14 +17,14 @@ class Service:
 
     port: int
     protocol: str = "tcp"  # "tcp" | "udp"
-    name: Optional[str] = None  # logical service, e.g. "http"
-    product: Optional[str] = None  # detected software, e.g. "nginx"
-    version: Optional[str] = None
+    name: str | None = None  # logical service, e.g. "http"
+    product: str | None = None  # detected software, e.g. "nginx"
+    version: str | None = None
     state: str = "open"  # "open" | "filtered" | "closed"
-    banner: Optional[str] = None
+    banner: str | None = None
     # How this service was detected, e.g. "banner", "nmap", "ssh-probe".
-    source: Optional[str] = None
-    extra: Dict[str, Any] = field(default_factory=dict)
+    source: str | None = None
+    extra: dict[str, Any] = field(default_factory=dict)
 
     @property
     def key(self) -> str:
@@ -42,7 +42,7 @@ class Service:
             return f"{bits} {self.version}"
         return bits
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "port": self.port,
             "protocol": self.protocol,
@@ -56,7 +56,7 @@ class Service:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Service":
+    def from_dict(cls, data: dict[str, Any]) -> Service:
         return cls(
             port=int(data["port"]),
             protocol=data.get("protocol", "tcp"),

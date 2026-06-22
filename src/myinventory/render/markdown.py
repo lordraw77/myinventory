@@ -13,7 +13,6 @@ from __future__ import annotations
 
 import re
 from pathlib import Path
-from typing import List
 
 from ..models import Host, Inventory
 
@@ -23,10 +22,10 @@ def _slug(raw: str) -> str:
 
 
 class MarkdownRenderer:
-    def render(self, inventory: Inventory, out_dir: str | Path) -> List[Path]:
+    def render(self, inventory: Inventory, out_dir: str | Path) -> list[Path]:
         out = Path(out_dir)
         (out / "hosts").mkdir(parents=True, exist_ok=True)
-        written: List[Path] = []
+        written: list[Path] = []
 
         written.append(self._write(out / "index.md", self._index(inventory)))
         for host in inventory.hosts.values():

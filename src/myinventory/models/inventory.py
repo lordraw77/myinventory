@@ -3,9 +3,10 @@
 from __future__ import annotations
 
 import json
+from collections.abc import Iterable
 from dataclasses import dataclass, field
 from datetime import datetime, timezone
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any
 
 from .host import Host
 from .network import Network
@@ -26,9 +27,9 @@ class Inventory:
     not an append. This is what keeps the JSON/Markdown output diffable.
     """
 
-    hosts: Dict[str, Host] = field(default_factory=dict)
-    vms: Dict[str, VirtualMachine] = field(default_factory=dict)
-    networks: List[Network] = field(default_factory=list)
+    hosts: dict[str, Host] = field(default_factory=dict)
+    vms: dict[str, VirtualMachine] = field(default_factory=dict)
+    networks: list[Network] = field(default_factory=list)
     generated_at: str = field(default_factory=_utcnow)
     schema_version: int = SCHEMA_VERSION
 
@@ -52,23 +53,23 @@ class Inventory:
         if not any(n.cidr == network.cidr for n in self.networks):
             self.networks.append(network)
 
-    def network_for(self, address: str) -> Optional[Network]:
+    def network_for(self, address: str) -> Network | None:
         for net in self.networks:
             if net.contains(address):
                 return net
         return None
 
-    def hosts_in(self, network: Network) -> List[Host]:
+    def hosts_in(self, network: Network) -> list[Host]:
         return [
             h
             for h in self.hosts.values()
             if any(network.contains(a) for a in h.addresses)
         ]
 
-    def vms_of(self, hypervisor_id: str) -> List[VirtualMachine]:
+    def vms_of(self, hypervisor_id: str) -> list[VirtualMachine]:
         return [v for v in self.vms.values() if v.hypervisor_id == hypervisor_id]
 
-    def merge(self, other: "Inventory") -> None:
+    def merge(self, other: Inventory) -> None:
         """Merge another inventory (e.g. a prior scan) into this one."""
         for net in other.networks:
             self.add_network(net)
@@ -78,7 +79,7 @@ class Inventory:
             self.upsert_vm(vm)
 
     # --- serialization ----------------------------------------------------
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "schema_version": self.schema_version,
             "generated_at": self.generated_at,
@@ -88,7 +89,7 @@ class Inventory:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Inventory":
+    def from_dict(cls, data: dict[str, Any]) -> Inventory:
         inv = cls(
             generated_at=data.get("generated_at", _utcnow()),
             schema_version=int(data.get("schema_version", SCHEMA_VERSION)),
@@ -106,7 +107,7 @@ class Inventory:
         return json.dumps(self.to_dict(), indent=indent, sort_keys=False)
 
     @classmethod
-    def from_json(cls, text: str) -> "Inventory":
+    def from_json(cls, text: str) -> Inventory:
         return cls.from_dict(json.loads(text))
 
 
@@ -134,6 +135,6 @@ def _merge_host(target: Host, incoming: Host) -> None:
     target.extra.update(incoming.extra)
 
 
-def _union(a: Iterable[str], b: Iterable[str]) -> List[str]:
+def _union(a: Iterable[str], b: Iterable[str]) -> list[str]:
     """Order-preserving de-duplicated union."""
     return list(dict.fromkeys([*a, *b]))

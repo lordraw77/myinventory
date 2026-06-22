@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass, field
 from enum import Enum
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 from .service import Service
 
@@ -42,33 +42,33 @@ class Host:
     """
 
     id: str
-    addresses: List[str] = field(default_factory=list)
-    hostname: Optional[str] = None
-    mac: Optional[str] = None
+    addresses: list[str] = field(default_factory=list)
+    hostname: str | None = None
+    mac: str | None = None
     role: HostRole = HostRole.UNKNOWN
-    os: Optional[str] = None
-    services: List[Service] = field(default_factory=list)
-    tags: List[str] = field(default_factory=list)
-    sources: List[DiscoverySource] = field(default_factory=list)
+    os: str | None = None
+    services: list[Service] = field(default_factory=list)
+    tags: list[str] = field(default_factory=list)
+    sources: list[DiscoverySource] = field(default_factory=list)
 
     # Relationships (populated by virtualization backends + correlation).
-    hypervisor_id: Optional[str] = None  # set when this host is a VM
-    hosted_vm_ids: List[str] = field(default_factory=list)  # set on a hypervisor
+    hypervisor_id: str | None = None  # set when this host is a VM
+    hosted_vm_ids: list[str] = field(default_factory=list)  # set on a hypervisor
 
-    first_seen: Optional[str] = None  # ISO-8601 UTC
-    last_seen: Optional[str] = None  # ISO-8601 UTC
-    extra: Dict[str, Any] = field(default_factory=dict)
+    first_seen: str | None = None  # ISO-8601 UTC
+    last_seen: str | None = None  # ISO-8601 UTC
+    extra: dict[str, Any] = field(default_factory=dict)
 
     # --- identity ---------------------------------------------------------
     @property
-    def primary_address(self) -> Optional[str]:
+    def primary_address(self) -> str | None:
         return self.addresses[0] if self.addresses else None
 
     @staticmethod
     def compute_id(
-        mac: Optional[str] = None,
-        address: Optional[str] = None,
-        hostname: Optional[str] = None,
+        mac: str | None = None,
+        address: str | None = None,
+        hostname: str | None = None,
     ) -> str:
         """Stable identity in priority order: MAC > IP > hostname.
 
@@ -96,7 +96,7 @@ class Host:
         return self.role == HostRole.HYPERVISOR or bool(self.hosted_vm_ids)
 
     # --- serialization ----------------------------------------------------
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "id": self.id,
             "addresses": self.addresses,
@@ -115,7 +115,7 @@ class Host:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Host":
+    def from_dict(cls, data: dict[str, Any]) -> Host:
         return cls(
             id=data["id"],
             addresses=list(data.get("addresses", [])),

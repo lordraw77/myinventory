@@ -9,7 +9,6 @@ silent.
 from __future__ import annotations
 
 import socket
-from typing import List, Optional
 
 from ...models import Host, Service
 from ..base import ServiceProbe, register_probe
@@ -24,25 +23,25 @@ HTTP_PORTS = {80, 8080, 8006, 9090}
 class BannerProbe(ServiceProbe):
     """Identify services by their connect-time banner."""
 
-    def probe(self, host: Host) -> List[Service]:
+    def probe(self, host: Host) -> list[Service]:
         ports = self._candidate_ports(host)
-        timeout = float(self.options.get("timeout", 1.0))
+        timeout = float(self.options.get("timeout", 1.0))  # type: ignore[arg-type]
         address = host.primary_address
         if not address:
             return []
 
-        services: List[Service] = []
+        services: list[Service] = []
         for port in ports:
             svc = self._probe_port(address, port, timeout)
             if svc is not None:
                 services.append(svc)
         return services
 
-    def _candidate_ports(self, host: Host) -> List[int]:
+    def _candidate_ports(self, host: Host) -> list[int]:
         known = [s.port for s in host.services if s.protocol == "tcp"]
         return known or DEFAULT_PORTS
 
-    def _probe_port(self, address: str, port: int, timeout: float) -> Optional[Service]:
+    def _probe_port(self, address: str, port: int, timeout: float) -> Service | None:
         try:
             with socket.create_connection((address, port), timeout=timeout) as sock:
                 sock.settimeout(timeout)
@@ -65,7 +64,7 @@ class BannerProbe(ServiceProbe):
         )
 
     @staticmethod
-    def _match(banner: str, port: int) -> tuple[Optional[str], str]:
+    def _match(banner: str, port: int) -> tuple[str | None, str]:
         low = banner.lower()
         for needle, (name, product) in BANNER_SIGNATURES.items():
             if needle in low:

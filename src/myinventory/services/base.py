@@ -9,7 +9,7 @@ credentials are configured.
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from typing import Callable, Dict, List, Type
+from typing import Callable
 
 from ..models import Host, Service
 
@@ -24,17 +24,17 @@ class ServiceProbe(ABC):
         self.options = options
 
     @abstractmethod
-    def probe(self, host: Host) -> List[Service]:
+    def probe(self, host: Host) -> list[Service]:
         """Inspect ``host`` and return any services found (may be empty)."""
         raise NotImplementedError
 
 
 # --- registry -------------------------------------------------------------
-_REGISTRY: Dict[str, Type[ServiceProbe]] = {}
+_REGISTRY: dict[str, type[ServiceProbe]] = {}
 
 
-def register_probe(name: str) -> Callable[[Type[ServiceProbe]], Type[ServiceProbe]]:
-    def _decorator(cls: Type[ServiceProbe]) -> Type[ServiceProbe]:
+def register_probe(name: str) -> Callable[[type[ServiceProbe]], type[ServiceProbe]]:
+    def _decorator(cls: type[ServiceProbe]) -> type[ServiceProbe]:
         cls.name = name
         _REGISTRY[name] = cls
         return cls
@@ -48,5 +48,5 @@ def get_probe(name: str, **options: object) -> ServiceProbe:
     return _REGISTRY[name](**options)
 
 
-def available() -> List[str]:
+def available() -> list[str]:
     return sorted(_REGISTRY)

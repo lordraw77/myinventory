@@ -7,7 +7,7 @@ Legend: ☐ todo · ◐ in progress · ☑ done
 
 ---
 
-## Milestone 0 — Foundations (`v0.1`) ◐
+## Milestone 0 — Foundations (`v0.1`) ☑
 
 Scaffold, data model, contracts and docs. No live scanning yet, but the model
 and renderers are real and testable against fixtures.
@@ -18,12 +18,12 @@ and renderers are real and testable against fixtures.
   with JSON (de)serialization.
 - ☑ Plugin registries and abstract base classes for discovery / services /
   virtualization.
-- ☐ Storage repository: persist + merge by stable ID.
-- ☐ D2 renderer (network map, subnet maps, hypervisor→VM map).
-- ☐ Markdown renderer (index + per-host pages + tables).
-- ☐ CLI skeleton (`scan`, `render`, `report`, `validate-config`) wired to a
+- ☑ Storage repository: persist + merge by stable ID.
+- ☑ D2 renderer (network map, subnet maps, hypervisor→VM map).
+- ☑ Markdown renderer (index + per-host pages + tables).
+- ☑ CLI skeleton (`scan`, `render`, `report`, `validate-config`) wired to a
   fixture inventory.
-- ☐ Unit tests for model round-trip, merge, and both renderers.
+- ☑ Unit tests for model round-trip, merge, and both renderers.
 
 **Exit criteria:** `myinventory render --in fixtures/inventory.json` produces
 valid D2 + Markdown.

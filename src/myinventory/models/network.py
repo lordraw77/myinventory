@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import ipaddress
 from dataclasses import dataclass, field
-from typing import Any, Dict, Optional
+from typing import Any
 
 
 @dataclass
@@ -16,10 +16,10 @@ class Network:
     """
 
     cidr: str
-    name: Optional[str] = None
-    vlan: Optional[int] = None
-    description: Optional[str] = None
-    extra: Dict[str, Any] = field(default_factory=dict)
+    name: str | None = None
+    vlan: int | None = None
+    description: str | None = None
+    extra: dict[str, Any] = field(default_factory=dict)
 
     @property
     def label(self) -> str:
@@ -34,7 +34,7 @@ class Network:
         except ValueError:
             return False
 
-    def to_dict(self) -> Dict[str, Any]:
+    def to_dict(self) -> dict[str, Any]:
         return {
             "cidr": self.cidr,
             "name": self.name,
@@ -44,7 +44,7 @@ class Network:
         }
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "Network":
+    def from_dict(cls, data: dict[str, Any]) -> Network:
         return cls(
             cidr=data["cidr"],
             name=data.get("name"),

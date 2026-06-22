@@ -16,13 +16,12 @@ from __future__ import annotations
 
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
-from typing import List
 
 from ..config import AppConfig, HypervisorTarget, NetworkTarget
 from ..discovery import DiscoveryResult, get_discovery
 from ..models import Inventory, Network
 from ..services import get_probe
-from ..virtualization import get_backend
+from ..virtualization import BackendResult, get_backend
 
 
 @dataclass
@@ -32,7 +31,7 @@ class ScanReport:
     hosts_found: int = 0
     services_found: int = 0
     vms_found: int = 0
-    errors: List[str] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
     def __str__(self) -> str:
         line = (
@@ -105,12 +104,10 @@ class Orchestrator:
             for vm in result.vms:
                 inventory.upsert_vm(vm)
 
-    def _run_backend(self, target: HypervisorTarget):
+    def _run_backend(self, target: HypervisorTarget) -> BackendResult:
         try:
             return get_backend(target.type).run(target)
         except Exception as exc:  # noqa: BLE001
-            from ..virtualization import BackendResult
-
             return BackendResult(errors=[f"virt/{target.type} @ {target.host}: {exc}"])
 
     # --- stage 4: correlation --------------------------------------------

@@ -15,7 +15,6 @@ from __future__ import annotations
 import argparse
 import sys
 from pathlib import Path
-from typing import List, Optional
 
 from . import __version__
 from .config import AppConfig, ConfigError
@@ -25,7 +24,7 @@ from .render import D2Renderer, MarkdownRenderer
 from .storage import JsonInventoryRepository
 
 
-def main(argv: Optional[List[str]] = None) -> int:
+def main(argv: list[str] | None = None) -> int:
     parser = _build_parser()
     args = parser.parse_args(argv)
     if not getattr(args, "func", None):

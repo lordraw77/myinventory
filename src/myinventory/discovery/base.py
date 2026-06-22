@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from dataclasses import dataclass, field
-from typing import Callable, Dict, List, Type
+from typing import Callable
 
 from ..models import Host
 
@@ -21,8 +21,8 @@ from ..models import Host
 class DiscoveryResult:
     """Output of one discovery run against one network target."""
 
-    hosts: List[Host] = field(default_factory=list)
-    errors: List[str] = field(default_factory=list)
+    hosts: list[Host] = field(default_factory=list)
+    errors: list[str] = field(default_factory=list)
 
 
 class HostDiscovery(ABC):
@@ -40,19 +40,19 @@ class HostDiscovery(ABC):
         self.options = options
 
     @abstractmethod
-    def discover(self, target: "object") -> DiscoveryResult:
+    def discover(self, target: object) -> DiscoveryResult:
         """Scan ``target`` (a ``NetworkTarget``) and return live hosts."""
         raise NotImplementedError
 
 
 # --- registry -------------------------------------------------------------
-_REGISTRY: Dict[str, Type[HostDiscovery]] = {}
+_REGISTRY: dict[str, type[HostDiscovery]] = {}
 
 
-def register_discovery(name: str) -> Callable[[Type[HostDiscovery]], Type[HostDiscovery]]:
+def register_discovery(name: str) -> Callable[[type[HostDiscovery]], type[HostDiscovery]]:
     """Class decorator that registers a discovery backend under ``name``."""
 
-    def _decorator(cls: Type[HostDiscovery]) -> Type[HostDiscovery]:
+    def _decorator(cls: type[HostDiscovery]) -> type[HostDiscovery]:
         cls.name = name
         _REGISTRY[name] = cls
         return cls
@@ -68,5 +68,5 @@ def get_discovery(name: str, **options: object) -> HostDiscovery:
     return _REGISTRY[name](**options)
 
 
-def available() -> List[str]:
+def available() -> list[str]:
     return sorted(_REGISTRY)

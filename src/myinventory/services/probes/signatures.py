@@ -14,9 +14,7 @@ adds version extraction; the optional ``nmap`` backend supersedes it when the
 
 from __future__ import annotations
 
-from typing import Dict, Tuple
-
-WELL_KNOWN_PORTS: Dict[int, str] = {
+WELL_KNOWN_PORTS: dict[int, str] = {
     21: "ftp",
     22: "ssh",
     23: "telnet",
@@ -42,7 +40,7 @@ WELL_KNOWN_PORTS: Dict[int, str] = {
 }
 
 # Lower-cased substring found in the banner -> (logical name, product).
-BANNER_SIGNATURES: Dict[str, Tuple[str, str]] = {
+BANNER_SIGNATURES: dict[str, tuple[str, str]] = {
     "ssh-": ("ssh", "OpenSSH"),
     "http/1.": ("http", ""),
     "server: nginx": ("http", "nginx"),

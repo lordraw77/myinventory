@@ -6,7 +6,6 @@ discovery against the committed fixture inventory.
 
 from __future__ import annotations
 
-import json
 from pathlib import Path
 
 import pytest
@@ -73,7 +72,7 @@ def test_d2_renderer(tmp_path: Path, inventory: Inventory) -> None:
 
 
 def test_markdown_renderer(tmp_path: Path, inventory: Inventory) -> None:
-    files = MarkdownRenderer().render(inventory, tmp_path)
+    MarkdownRenderer().render(inventory, tmp_path)
     assert (tmp_path / "index.md").exists()
     index = (tmp_path / "index.md").read_text()
     assert "Network Inventory" in index

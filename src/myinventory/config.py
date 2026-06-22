@@ -10,7 +10,7 @@ from __future__ import annotations
 import os
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any, Dict, List, Optional
+from typing import Any
 
 import yaml
 
@@ -24,10 +24,10 @@ class NetworkTarget:
     """A subnet to scan and the discovery backends to use on it."""
 
     cidr: str
-    name: Optional[str] = None
-    vlan: Optional[int] = None
-    discovery: List[str] = field(default_factory=lambda: ["tcp"])
-    probe_ports: Optional[List[int]] = None
+    name: str | None = None
+    vlan: int | None = None
+    discovery: list[str] = field(default_factory=lambda: ["tcp"])
+    probe_ports: list[int] | None = None
     timeout: float = 0.5
     workers: int = 128
 
@@ -38,12 +38,12 @@ class HypervisorTarget:
 
     type: str  # registry key: "proxmox" | "vmware" | "libvirt"
     host: str
-    username: Optional[str] = None
-    password: Optional[str] = None
-    token_name: Optional[str] = None
-    secret: Optional[str] = None
+    username: str | None = None
+    password: str | None = None
+    token_name: str | None = None
+    secret: str | None = None
     verify_tls: bool = True
-    name: Optional[str] = None
+    name: str | None = None
 
 
 @dataclass
@@ -59,27 +59,27 @@ class LinuxSshTarget:
 
     host: str
     username: str = "root"
-    password: Optional[str] = None
-    key_file: Optional[str] = None
+    password: str | None = None
+    key_file: str | None = None
     sudo: bool = False
-    sudo_password: Optional[str] = None
+    sudo_password: str | None = None
     port: int = 22
-    name: Optional[str] = None
+    name: str | None = None
 
 
 @dataclass
 class AppConfig:
     """Top-level configuration."""
 
-    networks: List[NetworkTarget] = field(default_factory=list)
-    hypervisors: List[HypervisorTarget] = field(default_factory=list)
-    linux_ssh: List[LinuxSshTarget] = field(default_factory=list)
-    service_probes: List[str] = field(default_factory=lambda: ["banner"])
+    networks: list[NetworkTarget] = field(default_factory=list)
+    hypervisors: list[HypervisorTarget] = field(default_factory=list)
+    linux_ssh: list[LinuxSshTarget] = field(default_factory=list)
+    service_probes: list[str] = field(default_factory=lambda: ["banner"])
     workers: int = 64
     output_dir: str = "./out"
 
     @classmethod
-    def load(cls, path: str | Path) -> "AppConfig":
+    def load(cls, path: str | Path) -> AppConfig:
         path = Path(path)
         if not path.exists():
             raise ConfigError(f"config file not found: {path}")
@@ -87,7 +87,7 @@ class AppConfig:
         return cls.from_dict(data)
 
     @classmethod
-    def from_dict(cls, data: Dict[str, Any]) -> "AppConfig":
+    def from_dict(cls, data: dict[str, Any]) -> AppConfig:
         networks = [_network(n) for n in data.get("networks", [])]
         hypervisors = [_hypervisor(h) for h in data.get("hypervisors", [])]
         linux_ssh = [_linux_ssh(s) for s in data.get("linux_ssh", [])]
@@ -101,7 +101,7 @@ class AppConfig:
         )
 
 
-def _network(data: Dict[str, Any]) -> NetworkTarget:
+def _network(data: dict[str, Any]) -> NetworkTarget:
     if "cidr" not in data:
         raise ConfigError("each network entry requires a 'cidr'")
     return NetworkTarget(
@@ -115,7 +115,7 @@ def _network(data: Dict[str, Any]) -> NetworkTarget:
     )
 
 
-def _hypervisor(data: Dict[str, Any]) -> HypervisorTarget:
+def _hypervisor(data: dict[str, Any]) -> HypervisorTarget:
     for required in ("type", "host"):
         if required not in data:
             raise ConfigError(f"each hypervisor entry requires '{required}'")
@@ -131,7 +131,7 @@ def _hypervisor(data: Dict[str, Any]) -> HypervisorTarget:
     )
 
 
-def _linux_ssh(data: Dict[str, Any]) -> LinuxSshTarget:
+def _linux_ssh(data: dict[str, Any]) -> LinuxSshTarget:
     if "host" not in data:
         raise ConfigError("each linux_ssh entry requires a 'host'")
     sudo_password = _resolve_secret(data.get("sudo_password"))
@@ -148,7 +148,7 @@ def _linux_ssh(data: Dict[str, Any]) -> LinuxSshTarget:
     )
 
 
-def _resolve_secret(ref: Optional[str]) -> Optional[str]:
+def _resolve_secret(ref: str | None) -> str | None:
     """Resolve a secret reference.
 
     * ``env:NAME``   -> value of environment variable ``NAME``

@@ -13,10 +13,13 @@ from __future__ import annotations
 import socket
 from concurrent.futures import ThreadPoolExecutor
 from ipaddress import ip_network
-from typing import List
+from typing import TYPE_CHECKING, cast
 
 from ..models import DiscoverySource, Host
 from .base import DiscoveryResult, HostDiscovery, register_discovery
+
+if TYPE_CHECKING:
+    from ..config import NetworkTarget
 
 # Ports likely to be open on *something* worth inventorying.
 DEFAULT_PROBE_PORTS = (22, 80, 443, 445, 3389, 8006, 902)
@@ -26,8 +29,8 @@ DEFAULT_PROBE_PORTS = (22, 80, 443, 445, 3389, 8006, 902)
 class TcpConnectDiscovery(HostDiscovery):
     """Find live hosts by attempting TCP connections to common ports."""
 
-    def discover(self, target: "object") -> DiscoveryResult:
-        cidr = getattr(target, "cidr")
+    def discover(self, target: object) -> DiscoveryResult:
+        cidr = cast("NetworkTarget", target).cidr
         ports = list(getattr(target, "probe_ports", None) or DEFAULT_PROBE_PORTS)
         timeout = float(getattr(target, "timeout", 0.5))
         workers = int(getattr(target, "workers", 128))
@@ -49,8 +52,8 @@ class TcpConnectDiscovery(HostDiscovery):
         return result
 
     @staticmethod
-    def _scan(address: str, ports: List[int], timeout: float) -> List[int]:
-        open_ports: List[int] = []
+    def _scan(address: str, ports: list[int], timeout: float) -> list[int]:
+        open_ports: list[int] = []
         for port in ports:
             try:
                 with socket.create_connection((address, port), timeout=timeout):

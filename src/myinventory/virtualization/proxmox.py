@@ -14,10 +14,13 @@ API used (read-only):
 
 from __future__ import annotations
 
-from typing import List
+from typing import TYPE_CHECKING, Any, cast
 
 from ..models import DiscoverySource, Host, HostRole, PowerState, VirtualMachine
 from .base import BackendResult, VirtualizationBackend, register_backend
+
+if TYPE_CHECKING:
+    from ..config import HypervisorTarget
 
 
 @register_backend("proxmox")
@@ -26,9 +29,9 @@ class ProxmoxBackend(VirtualizationBackend):
 
     def __init__(self, **options: object) -> None:
         super().__init__(**options)
-        self._api = None  # set in connect()
+        self._api: Any = None  # set in connect()
 
-    def connect(self, target: "object") -> None:
+    def connect(self, target: object) -> None:
         try:
             from proxmoxer import ProxmoxAPI  # type: ignore
         except ImportError as exc:  # pragma: no cover - depends on extra
@@ -38,14 +41,14 @@ class ProxmoxBackend(VirtualizationBackend):
             ) from exc
 
         self._api = ProxmoxAPI(
-            getattr(target, "host"),
+            cast("HypervisorTarget", target).host,
             user=getattr(target, "username", None),
             verify_ssl=getattr(target, "verify_tls", True),
             **self._auth_kwargs(target),
         )
 
     @staticmethod
-    def _auth_kwargs(target: "object") -> dict:
+    def _auth_kwargs(target: object) -> dict:
         """Pick the auth method: API token if given, otherwise password login.
 
         Proxmox accepts either an API token (``token_name`` + ``secret``) or a
@@ -70,7 +73,7 @@ class ProxmoxBackend(VirtualizationBackend):
             "credentials: set either 'token_name'+'secret' or 'password'"
         )
 
-    def collect(self, target: "object") -> BackendResult:
+    def collect(self, target: object) -> BackendResult:
         if self._api is None:  # pragma: no cover - guarded by run()
             raise RuntimeError("connect() must be called before collect()")
 
@@ -87,7 +90,7 @@ class ProxmoxBackend(VirtualizationBackend):
         return result
 
     # --- helpers ----------------------------------------------------------
-    def _guests(self, node_name: str) -> List[dict]:
+    def _guests(self, node_name: str) -> list[dict]:
         qemu = self._api.nodes(node_name).qemu.get()
         lxc = self._api.nodes(node_name).lxc.get()
         for g in qemu:
@@ -97,8 +100,8 @@ class ProxmoxBackend(VirtualizationBackend):
         return [*qemu, *lxc]
 
     @staticmethod
-    def _hypervisor_host(node: dict, target: "object") -> Host:
-        mgmt_ip = getattr(target, "host")
+    def _hypervisor_host(node: dict, target: object) -> Host:
+        mgmt_ip = cast("HypervisorTarget", target).host
         return Host(
             id=Host.compute_id(address=mgmt_ip, hostname=node["node"]),
             addresses=[mgmt_ip],

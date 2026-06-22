@@ -10,14 +10,13 @@ from __future__ import annotations
 
 from abc import ABC, abstractmethod
 from pathlib import Path
-from typing import Optional
 
 from ..models import Inventory
 
 
 class InventoryRepository(ABC):
     @abstractmethod
-    def load(self) -> Optional[Inventory]:
+    def load(self) -> Inventory | None:
         """Return the stored inventory, or ``None`` if there is none yet."""
 
     @abstractmethod
@@ -40,7 +39,7 @@ class JsonInventoryRepository(InventoryRepository):
     def __init__(self, path: str | Path) -> None:
         self.path = Path(path)
 
-    def load(self) -> Optional[Inventory]:
+    def load(self) -> Inventory | None:
         if not self.path.exists():
             return None
         return Inventory.from_json(self.path.read_text())

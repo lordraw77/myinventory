@@ -6,7 +6,9 @@ versioning.
 
 ## [Unreleased]
 
-Milestone 0 — Foundations (in progress, see [docs/roadmap.md](docs/roadmap.md)).
+Milestone 0 — Foundations (complete, see [docs/roadmap.md](docs/roadmap.md)).
+Exit criteria met: `myinventory render --in fixtures/inventory.json` produces
+valid D2 diagrams and Markdown documentation.
 
 ### Added
 - Project scaffold, packaging (`pyproject.toml`), lint/type/test config.
@@ -23,4 +25,8 @@ Milestone 0 — Foundations (in progress, see [docs/roadmap.md](docs/roadmap.md)
 - D2 renderer (network / subnet / hypervisor diagrams) and Markdown renderer
   (index + per-host pages).
 - CLI: `scan`, `render`, `report`, `list`, `validate-config`.
-- Test suite covering model round-trip, merge and both renderers.
+- Sample `fixtures/inventory.json` so the renderers can be demoed without
+  scanning a live network.
+- `py.typed` marker so downstream consumers get the package's type hints.
+- Test suite covering model round-trip, merge, the storage repository and both
+  renderers.
