@@ -16,13 +16,19 @@ pip install -e ".[all]"    # everything
 ## Commands
 
 ```
-myinventory scan             -c CONFIG [-o OUT]   discover + persist the inventory
-myinventory render           [-i IN] [-o OUT]     write D2 diagrams + Markdown docs
-myinventory report           -c CONFIG [-o OUT]   scan, then render (one shot)
+myinventory scan             -c CONFIG [-o OUT] [-p PROFILE] [--no-lock]
+myinventory render           [-i IN] [-o OUT] [--html]
+myinventory report           -c CONFIG [-o OUT] [-p PROFILE] [--no-lock] [--html]
 myinventory list             [-i IN] [--stale N]  text summary of a stored inventory
 myinventory diff             [-i IN] [--from ID] [--to ID] [A B] [--json]
-myinventory validate-config  -c CONFIG            check a config without scanning
+myinventory validate-config  -c CONFIG [-p PROFILE]  check a config without scanning
 ```
+
+`--html` also writes a static HTML site under `<out>/site/`; `--profile` selects
+a named overlay from a multi-site config; `scan`/`report` take a lockfile so a
+scheduled run can't race itself (`--no-lock` opts out). See
+[operations.md](operations.md) for scheduling, notifications, Docker and
+profiles.
 
 `scan` and `render` are split deliberately: `scan` touches the network and is
 the slow/privileged step; `render` is a pure, instant transform you can run as
@@ -80,14 +86,19 @@ the same; pass the `.db` path to `-i` for `render`/`list`/`diff`.
 myinventory render -i ./out/inventory.json -o ./site
 ```
 
-## Scheduling (preview)
+### Static HTML site
 
-Until the built-in scheduler lands (roadmap M5), a cron/systemd timer works:
-
-```cron
-# every night at 02:00, scan and regenerate the docs
-0 2 * * *  cd /opt/myinventory && PROXMOX_TOKEN=… .venv/bin/myinventory report -c myinventory.yaml -o /var/lib/myinventory/out
+```bash
+myinventory render -i ./out/inventory.json -o ./out --html
+python -m http.server -d ./out/site 8080      # preview at http://localhost:8080
 ```
+
+## Scheduling, notifications, Docker
+
+Running on a timer (systemd/cron), opt-in webhook/email alerts on change, the
+container image and multi-site profiles all live in
+[operations.md](operations.md). Ready-made unit/timer/cron files are in
+[`deploy/`](../deploy/).
 
 ## Exit codes
 
@@ -95,7 +106,8 @@ Until the built-in scheduler lands (roadmap M5), a cron/systemd timer works:
 |---|---|
 | 0 | success |
 | 1 | no command / usage error |
-| 2 | config error (bad file, missing secret) |
+| 2 | config error (bad file, missing secret, unknown profile) |
+| 3 | lock held by another running scan |
 
 Per-target failures during a scan are **not** fatal — they are printed to stderr
 and recorded, and the scan still produces output for everything that worked.

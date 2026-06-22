@@ -1,0 +1,41 @@
+# systemd service for a scheduled myinventory scan.
+#
+# Install:
+#   sudo cp deploy/myinventory.service deploy/myinventory.timer /etc/systemd/system/
+#   sudo mkdir -p /etc/myinventory /var/lib/myinventory
+#   sudo cp myinventory.yaml /etc/myinventory/config.yaml
+#   # put secrets in an env file (chmod 600), referenced as env:NAME in the config:
+#   sudo install -m600 /dev/stdin /etc/myinventory/secrets.env <<'EOF'
+#   PROXMOX_TOKEN=...
+#   EOF
+#   sudo systemctl daemon-reload
+#   sudo systemctl enable --now myinventory.timer
+#
+# This is a Type=oneshot job driven by myinventory.timer. The CLI takes its own
+# lockfile under the output directory, so an overrun never stacks two scans.
+
+[Unit]
+Description=myinventory network census scan
+Documentation=https://github.com/lordraw77/myinventory
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+DynamicUser=yes
+StateDirectory=myinventory
+EnvironmentFile=-/etc/myinventory/secrets.env
+ExecStart=/usr/local/bin/myinventory report \
+    -c /etc/myinventory/config.yaml \
+    -o /var/lib/myinventory/out \
+    --html
+Nice=10
+IOSchedulingClass=idle
+
+# Hardening — the scan only needs to read its config and write its output dir.
+NoNewPrivileges=yes
+ProtectSystem=strict
+ProtectHome=yes
+PrivateTmp=yes
+ReadWritePaths=/var/lib/myinventory
+ReadOnlyPaths=/etc/myinventory

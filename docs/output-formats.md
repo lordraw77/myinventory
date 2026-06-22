@@ -1,8 +1,9 @@
 # Output formats
 
-`myinventory render` turns a persisted `inventory.json` into two artifact sets.
-Both renderers are **pure functions of the model** — they do no scanning, so you
-can re-render anytime without touching the network.
+`myinventory render` turns a persisted `inventory.json` into D2 diagrams,
+Markdown docs and (with `--html`) a static site. The renderers are **pure
+functions of the model** — they do no scanning, so you can re-render anytime
+without touching the network.
 
 ```
 out/
@@ -13,11 +14,23 @@ out/
 │   ├── network.d2          # all subnets, each a container of hosts
 │   ├── hypervisors.d2      # each hypervisor containing its VMs
 │   └── subnet-<name>.d2    # one focused diagram per subnet
-└── docs/
-    ├── index.md            # summary + subnet tables + VM overview
-    ├── changelog.md        # what changed between scans, newest first
-    └── hosts/<id>.md       # one page per host
+├── docs/
+│   ├── index.md            # summary + subnet tables + VM overview
+│   ├── changelog.md        # what changed between scans, newest first
+│   └── hosts/<id>.md       # one page per host
+└── site/                   # static HTML site (only with --html)
+    ├── index.html          # summary + subnet tables + embedded network SVG
+    ├── style.css
+    ├── network.svg         # present when the `d2` binary is installed
+    └── hosts/<id>.html     # one page per host
 ```
+
+The `site/` tree is written only when `render`/`report` is given `--html`. It is
+self-contained static files — serve it with any web server or publish it to
+GitHub Pages / S3 / an internal share. With the [`d2`](https://d2lang.com) binary
+on `PATH` the network diagram is compiled to SVG and embedded on the index;
+without it the site still builds, just without the picture. See
+[operations.md](operations.md#html-site).
 
 With `storage.backend: sqlite` the cumulative state and the snapshot history live
 in a single `out/inventory.db` instead of `inventory.json` + `history/`; the

@@ -1,0 +1,17 @@
+# systemd timer that runs myinventory.service nightly.
+#
+# Edit OnCalendar to taste; `systemctl list-timers myinventory.timer` shows the
+# next run. Persistent=true catches up on a missed run after downtime.
+
+[Unit]
+Description=Run myinventory scan on a schedule
+Documentation=https://github.com/lordraw77/myinventory
+
+[Timer]
+OnCalendar=*-*-* 02:00:00
+RandomizedDelaySec=300
+Persistent=true
+Unit=myinventory.service
+
+[Install]
+WantedBy=timers.target

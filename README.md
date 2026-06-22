@@ -37,8 +37,9 @@ it in a diffable, version-controllable form (D2 + Markdown).
 | VM discovery | Connect to Proxmox / VMware / libvirt and enumerate guests + their host. |
 | Normalized model | One inventory model regardless of how a fact was discovered. |
 | D2 maps | Network topology, hypervisor→VM relationships, per-subnet views. |
-| Markdown docs | Index + per-host pages + service/VM tables. |
+| Markdown + HTML | Index + per-host pages + service/VM tables; `--html` builds a static site. |
 | Repeatable | Stable host IDs so re-scans produce diffs, not noise. |
+| Operable | Scheduled + locked scans, opt-in webhook/email alerts on change, multi-site profiles, container image. |
 
 ## Quick start
 
@@ -75,8 +76,10 @@ d2 out/diagrams/network.d2 out/network.svg
 - [Data model](docs/data-model.md) — Host / Service / VirtualMachine / Inventory.
 - [Discovery](docs/discovery.md) — how hosts, services and VMs are found.
 - [Configuration](docs/configuration.md) — the YAML config reference.
-- [Output formats](docs/output-formats.md) — D2 and Markdown generation.
+- [Output formats](docs/output-formats.md) — D2, Markdown and HTML generation.
 - [Usage](docs/usage.md) — CLI reference and workflows.
+- [Tutorial](docs/tutorial.md) — zero-to-published-map walkthrough.
+- [Operations](docs/operations.md) — scheduling, notifications, profiles, Docker.
 - [Security & safety](docs/security.md) — scanning responsibly, credential handling.
 - [Contributing](docs/contributing.md) — writing new discovery/virt plugins.
 - [Architecture decisions](docs/adr/) — the "why" behind key choices.

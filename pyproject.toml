@@ -49,8 +49,8 @@ all = ["myinventory[scan,virt,ssh,snmp]"]
 myinventory = "myinventory.cli:main"
 
 [project.urls]
-Documentation = "https://github.com/alessandropioli/myinventory/tree/main/docs"
-Source = "https://github.com/alessandropioli/myinventory"
+Documentation = "https://github.com/lordraw77/myinventory/tree/main/docs"
+Source = "https://github.com/lordraw77/myinventory"
 
 [tool.setuptools.packages.find]
 where = ["src"]

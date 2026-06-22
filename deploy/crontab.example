@@ -1,0 +1,9 @@
+# Cron alternative to the systemd timer. Install with `crontab -e`.
+#
+# The CLI takes a lockfile under the output directory (-o), so if a scan runs
+# long the next cron tick exits immediately instead of running concurrently.
+# Keep secrets out of the crontab: source an env file (chmod 600) referenced as
+# env:NAME in the config.
+
+# m h dom mon dow  command
+0 2 * * *  set -a; . /etc/myinventory/secrets.env; set +a; /usr/local/bin/myinventory report -c /etc/myinventory/config.yaml -o /var/lib/myinventory/out --html >> /var/log/myinventory.log 2>&1

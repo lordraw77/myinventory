@@ -22,6 +22,9 @@ myinventory validate-config --config myinventory.yaml
 | `linux_ssh` | list | `[]` | Linux hosts to deep-inspect over SSH. |
 | `enrichment` | map | *(on)* | Post-scan enrichment passes (see below). |
 | `storage` | map | *(json)* | Persistence backend + change tracking (see below). |
+| `notifications` | map | *(off)* | Webhook/email alerts on change (see below). |
+| `site` | str | — | Label for this estate, used in titles + notifications. |
+| `profiles` | map | `{}` | Named overlays for multiple sites in one file (see below). |
 
 ## `networks[]`
 
@@ -241,11 +244,89 @@ Each scan is snapshotted **before** it merges into the cumulative state, so the
 history reflects exactly what each scan saw — the only way removals and drift are
 detectable, since the merge never drops a host.
 
+## `notifications`
+
+Opt-in alerts sent after a scan, when the diff against the previous snapshot is
+non-empty (Milestone 6). Both channels use only the standard library, so they
+add no install dependency. A failing channel is recorded as a scan error, never
+fatal. See [operations.md](operations.md).
+
+```yaml
+notifications:
+  enabled: true
+  on_change_only: true         # set false to notify after every scan
+  webhooks:
+    - url: https://hooks.slack.com/services/XXX/YYY/ZZZ
+      format: slack            # slack | json
+    - url: https://example.com/inventory-hook
+      format: json
+      headers:
+        Authorization: env:HOOK_TOKEN     # static headers (refs allowed)
+  email:
+    host: smtp.example.com
+    port: 587
+    sender: inventory@example.com
+    recipients: [ops@example.com]   # a bare string is accepted too
+    username: inventory@example.com
+    password: env:SMTP_PASSWORD
+    use_tls: true              # STARTTLS
+    subject_prefix: "[inv] "
+```
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `enabled` | bool | `false` | Master switch for all channels. |
+| `on_change_only` | bool | `true` | Skip notifying when nothing changed. |
+| `webhooks[].url` | str | — | Endpoint to POST to (required per entry). |
+| `webhooks[].format` | str | `json` | `json` (`{title,summary,body,diff}`) or `slack` (`{text}`). |
+| `webhooks[].headers` | map | `{}` | Extra request headers. |
+| `email.host` / `sender` | str | — | Required when an `email` block is present. |
+| `email.recipients` | list | `[]` | One or more addresses. |
+| `email.use_tls` | bool | `false` | Use STARTTLS. |
+| `email.username` / `password` | | — | Auth (attempted only when `username` is set). |
+
+The first scan against an empty history never notifies — there is nothing to
+compare against yet.
+
+## `profiles` and `site`
+
+A single config file can describe several estates. `profiles` is a map of
+named overlays; selecting one with `--profile NAME` deep-merges its keys over the
+base document. Nested maps merge key-by-key; lists (and scalars) are replaced
+wholesale. The selected profile name also becomes the default `site` label
+(used in HTML titles and notification subjects).
+
+```yaml
+# shared base
+workers: 64
+storage: { backend: json }
+enrichment: { classify: true }
+
+profiles:
+  home:
+    site: home-lab
+    networks:
+      - { cidr: 192.168.1.0/24, discovery: [tcp, arp] }
+  office:
+    site: hq
+    storage: { backend: sqlite }      # overrides just the backend
+    networks:
+      - { cidr: 10.0.0.0/24, discovery: [tcp] }
+```
+
+```bash
+myinventory report -c sites.yaml --profile home   -o ./out/home
+myinventory report -c sites.yaml --profile office -o ./out/office
+```
+
+`validate-config` lists the available profiles; pass `--profile` to validate a
+specific overlay. With no `--profile`, only the base document is used.
+
 ## Secrets
 
 Credentials are **never** written inline. Every secret field — `password`,
-`secret`, `sudo_password` and the SNMP `community` — takes a *reference* that is
-resolved at run time:
+`secret`, `sudo_password`, the SNMP `community` and the notification email
+`password` — takes a *reference* that is resolved at run time:
 
 | Form | Resolves to |
 |---|---|

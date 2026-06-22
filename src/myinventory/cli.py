@@ -23,18 +23,20 @@ from pathlib import Path
 from . import __version__
 from .config import AppConfig, ConfigError
 from .history import build_changelog, diff_inventories, render_diff_section, stale_hosts
+from .lock import FileLock, LockError
 from .logsetup import setup_logging
 from .models import Inventory
+from .notify import dispatch_change
 from .pipeline import Orchestrator
-
-log = logging.getLogger(__name__)
-from .render import D2Renderer, MarkdownRenderer
+from .render import D2Renderer, HtmlRenderer, MarkdownRenderer
 from .storage import (
     InventoryRepository,
     JsonInventoryRepository,
     SqliteInventoryRepository,
     make_repository,
 )
+
+log = logging.getLogger(__name__)
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -49,6 +51,9 @@ def main(argv: list[str] | None = None) -> int:
     except ConfigError as exc:
         print(f"config error: {exc}", file=sys.stderr)
         return 2
+    except LockError as exc:
+        print(f"lock error: {exc}", file=sys.stderr)
+        return 3
 
 
 def _build_parser() -> argparse.ArgumentParser:
@@ -67,9 +72,21 @@ def _build_parser() -> argparse.ArgumentParser:
 
     sub = p.add_subparsers(dest="command")
 
+    # Options shared by the scanning commands (scan, report).
+    def _add_scan_opts(sp: argparse.ArgumentParser) -> None:
+        sp.add_argument("-c", "--config", required=True)
+        sp.add_argument("-o", "--out", default="./out")
+        sp.add_argument(
+            "-p", "--profile", default=None, help="select a named config profile"
+        )
+        sp.add_argument(
+            "--no-lock",
+            action="store_true",
+            help="skip the concurrency lockfile (not recommended for scheduled runs)",
+        )
+
     scan = sub.add_parser("scan", parents=[common], help="discover and persist the inventory")
-    scan.add_argument("-c", "--config", required=True)
-    scan.add_argument("-o", "--out", default="./out")
+    _add_scan_opts(scan)
     scan.set_defaults(func=_cmd_scan)
 
     render = sub.add_parser(
@@ -77,11 +94,16 @@ def _build_parser() -> argparse.ArgumentParser:
     )
     render.add_argument("-i", "--in", dest="inp", default="./out/inventory.json")
     render.add_argument("-o", "--out", default="./out")
+    render.add_argument(
+        "--html", action="store_true", help="also render a static HTML site"
+    )
     render.set_defaults(func=_cmd_render)
 
     report = sub.add_parser("report", parents=[common], help="scan, then render (one shot)")
-    report.add_argument("-c", "--config", required=True)
-    report.add_argument("-o", "--out", default="./out")
+    _add_scan_opts(report)
+    report.add_argument(
+        "--html", action="store_true", help="also render a static HTML site"
+    )
     report.set_defaults(func=_cmd_report)
 
     lst = sub.add_parser("list", parents=[common], help="print a summary of a stored inventory")
@@ -111,6 +133,7 @@ def _build_parser() -> argparse.ArgumentParser:
 
     val = sub.add_parser("validate-config", parents=[common], help="check a config file")
     val.add_argument("-c", "--config", required=True)
+    val.add_argument("-p", "--profile", default=None, help="validate a named profile")
     val.set_defaults(func=_cmd_validate)
 
     return p
@@ -124,17 +147,79 @@ def _repo_for(path: str | Path) -> InventoryRepository:
     return JsonInventoryRepository(p)
 
 
+def _scan_and_persist(
+    args: argparse.Namespace,
+) -> tuple[AppConfig, InventoryRepository, Inventory]:
+    """Shared scan path for ``scan``/``report``: lock, scan, persist, notify."""
+    config = AppConfig.load(args.config, profile=getattr(args, "profile", None))
+    with _lock(args):
+        inventory, report = Orchestrator(config).scan()
+        repo = make_repository(config.storage.backend, args.out)
+        repo.save_merged(inventory, keep_history=config.storage.keep_history)
+        log.info("persisted inventory -> %s (%s)", args.out, config.storage.backend)
+        print(f"scan complete: {report}")
+        for err in report.errors:
+            print(f"  ! {err}", file=sys.stderr)
+        for err in _notify(config, repo):
+            print(f"  ! {err}", file=sys.stderr)
+    return config, repo, inventory
+
+
+def _lock(args: argparse.Namespace):  # type: ignore[no-untyped-def]
+    """Return the scan lock context, or a no-op when ``--no-lock`` is set."""
+    if getattr(args, "no_lock", False):
+        from contextlib import nullcontext
+
+        return nullcontext()
+    return FileLock(Path(args.out) / ".myinventory.lock")
+
+
+def _notify(config: AppConfig, repo: InventoryRepository) -> list[str]:
+    """Dispatch change notifications by diffing the last two snapshots."""
+    if not config.notifications.enabled:
+        return []
+    ids = repo.snapshot_ids()
+    if len(ids) < 2:
+        return []  # first scan: nothing to compare against yet
+    old = repo.load_snapshot(ids[-2])
+    new = repo.load_snapshot(ids[-1])
+    if old is None or new is None:
+        return []
+    diff = diff_inventories(old, new)
+    return dispatch_change(config.notifications, diff, site=config.site)
+
+
 def _cmd_scan(args: argparse.Namespace) -> int:
-    config = AppConfig.load(args.config)
-    inventory, report = Orchestrator(config).scan()
-    repo = make_repository(config.storage.backend, args.out)
-    repo.save_merged(inventory, keep_history=config.storage.keep_history)
-    log.info("persisted inventory -> %s (%s)", args.out, config.storage.backend)
-    print(f"scan complete: {report}")
-    for err in report.errors:
-        print(f"  ! {err}", file=sys.stderr)
+    config, _, _ = _scan_and_persist(args)
     print(f"saved -> {args.out} ({config.storage.backend})")
     return 0
+
+
+def _render_all(
+    inventory: Inventory,
+    repo: InventoryRepository,
+    out: Path,
+    *,
+    html: bool,
+    site: str | None,
+) -> None:
+    """Render D2 + Markdown (+ optional HTML) and print a one-line summary each."""
+    log.info("rendering diagrams + docs to %s", out)
+    changelog = build_changelog(repo.snapshots())
+    d2_files = D2Renderer().render(inventory, out / "diagrams")
+    md_files = MarkdownRenderer().render(inventory, out / "docs", changelog=changelog)
+    log.info("rendered %d D2 diagram(s), %d Markdown file(s)", len(d2_files), len(md_files))
+    print(f"rendered {len(d2_files)} D2 diagrams -> {out / 'diagrams'}")
+    print(f"rendered {len(md_files)} Markdown files -> {out / 'docs'}")
+    if html:
+        html_files = HtmlRenderer().render(
+            inventory,
+            out / "site",
+            diagrams_dir=out / "diagrams",
+            changelog_md=changelog,
+            site=site,
+        )
+        print(f"rendered {len(html_files)} HTML files -> {out / 'site'}")
 
 
 def _cmd_render(args: argparse.Namespace) -> int:
@@ -143,36 +228,14 @@ def _cmd_render(args: argparse.Namespace) -> int:
     if inventory is None:
         print(f"no inventory found at {args.inp}", file=sys.stderr)
         return 1
-    out = Path(args.out)
-    log.info("rendering diagrams + docs to %s", out)
-    changelog = build_changelog(repo.snapshots())
-    d2_files = D2Renderer().render(inventory, out / "diagrams")
-    md_files = MarkdownRenderer().render(inventory, out / "docs", changelog=changelog)
-    log.info("rendered %d D2 diagram(s), %d Markdown file(s)", len(d2_files), len(md_files))
-    print(f"rendered {len(d2_files)} D2 diagrams -> {out / 'diagrams'}")
-    print(f"rendered {len(md_files)} Markdown files -> {out / 'docs'}")
+    _render_all(inventory, repo, Path(args.out), html=args.html, site=None)
     return 0
 
 
 def _cmd_report(args: argparse.Namespace) -> int:
-    config = AppConfig.load(args.config)
-    inventory, report = Orchestrator(config).scan()
-    repo = make_repository(config.storage.backend, args.out)
-    repo.save_merged(inventory, keep_history=config.storage.keep_history)
-    log.info("persisted inventory -> %s (%s)", args.out, config.storage.backend)
-    print(f"scan complete: {report}")
-    for err in report.errors:
-        print(f"  ! {err}", file=sys.stderr)
-
+    config, repo, inventory = _scan_and_persist(args)
     merged = repo.load() or inventory
-    out = Path(args.out)
-    log.info("rendering diagrams + docs to %s", out)
-    changelog = build_changelog(repo.snapshots())
-    d2_files = D2Renderer().render(merged, out / "diagrams")
-    md_files = MarkdownRenderer().render(merged, out / "docs", changelog=changelog)
-    log.info("rendered %d D2 diagram(s), %d Markdown file(s)", len(d2_files), len(md_files))
-    print(f"rendered {len(d2_files)} D2 diagrams -> {out / 'diagrams'}")
-    print(f"rendered {len(md_files)} Markdown files -> {out / 'docs'}")
+    _render_all(merged, repo, Path(args.out), html=args.html, site=config.site)
     return 0
 
 
@@ -234,7 +297,8 @@ def _cmd_diff(args: argparse.Namespace) -> int:
 
 
 def _cmd_validate(args: argparse.Namespace) -> int:
-    config = AppConfig.load(args.config)
+    profiles = AppConfig.profile_names(args.config)
+    config = AppConfig.load(args.config, profile=args.profile)
     enr = config.enrichment
     passes = [
         name
@@ -246,6 +310,16 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         )
         if on
     ]
+    notif = config.notifications
+    channels = (
+        ["(disabled)"]
+        if not notif.enabled
+        else [
+            *(["webhook"] * len(notif.webhooks)),
+            *(["email"] if notif.email else []),
+        ]
+        or ["(no channels)"]
+    )
     print(
         f"config OK: {len(config.networks)} network(s), "
         f"{len(config.hypervisors)} hypervisor(s), "
@@ -253,6 +327,9 @@ def _cmd_validate(args: argparse.Namespace) -> int:
         f"probes={config.service_probes}, "
         f"enrichment={passes or ['(none)']}, "
         f"rules={len(enr.rules)}, "
-        f"storage={config.storage.backend}"
+        f"storage={config.storage.backend}, "
+        f"notifications={channels}, "
+        f"site={config.site or '(none)'}, "
+        f"profiles={profiles or ['(none)']}"
     )
     return 0

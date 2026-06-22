@@ -129,3 +129,42 @@ storage:
   backend: json              # json (inventory.json + history/) | sqlite (inventory.db)
   keep_history: true         # record a per-scan snapshot
   stale_after_scans: 3       # default N for `myinventory list --stale`
+
+# --- operability (Milestone 6) ---------------------------------------------
+# A label for this estate, used in HTML titles and notification subjects. When a
+# profile is selected with --profile, its name becomes the default site.
+# site: home-lab
+
+# Opt-in alerts sent after a scan, only when something changed (set
+# on_change_only: false to notify every scan). Stdlib-only; a failing channel is
+# recorded as a scan error, never fatal. See docs/operations.md.
+notifications:
+  enabled: false
+  on_change_only: true
+  webhooks: []
+  # webhooks:
+  #   - url: https://hooks.slack.com/services/XXX/YYY/ZZZ
+  #     format: slack            # slack | json
+  #   - url: https://example.com/inventory-hook
+  #     format: json
+  #     headers:
+  #       Authorization: env:HOOK_TOKEN
+  # email:
+  #   host: smtp.example.com
+  #   port: 587
+  #   sender: inventory@example.com
+  #   recipients: [ops@example.com]
+  #   username: inventory@example.com
+  #   password: env:SMTP_PASSWORD
+  #   use_tls: true
+  #   subject_prefix: "[inv] "
+
+# --- profiles / multiple sites (Milestone 6) -------------------------------
+# Named overlays deep-merged over the base config above; select one with
+# `--profile NAME`. Give each its own -o output dir. See docs/configuration.md.
+# profiles:
+#   office:
+#     site: hq
+#     storage: { backend: sqlite }     # overrides just the backend
+#     networks:
+#       - { cidr: 10.0.0.0/24, discovery: [tcp] }

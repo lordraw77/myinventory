@@ -6,6 +6,36 @@ versioning.
 
 ## [Unreleased]
 
+### Milestone 6 — Operability & polish (complete)
+
+Exit criteria met: a locked, scheduled scan publishes an HTML site and notifies
+on change, all from one config that can describe several sites. PyPI/`pipx`
+publishing is intentionally deferred — install from source or the container
+image.
+
+#### Added
+- **Lockfile** (`lock.py`): `scan`/`report` take an advisory, PID-stamped lock at
+  `<out>/.myinventory.lock` so an overrunning scheduled run backs off (exit code
+  3) instead of racing itself; a stale lock left by a dead process is reclaimed.
+  `--no-lock` opts out.
+- **Change notifications** (`notify/`): opt-in, stdlib-only webhook (Slack/JSON)
+  and SMTP email channels. After a scan the diff against the previous snapshot is
+  dispatched, best-effort; a failing channel is recorded, never fatal. Configured
+  under `notifications:` (off by default).
+- **HTML site** (`render/html.py`): `render --html` / `report --html` write a
+  self-contained static site under `<out>/site/`, embedding the network diagram
+  as SVG via the `d2` binary when present and degrading gracefully when absent.
+- **Profiles / multiple sites**: `profiles:` overlays deep-merged over the base
+  config, selected with `--profile`; a `site` label flows into HTML titles and
+  notification subjects. `validate-config` lists profiles.
+- **Container image** (`Dockerfile`) bundling all backends and `d2`, running
+  unprivileged; systemd `service`/`timer` and cron recipes under `deploy/`.
+- Docs: `operations.md` (scheduling, locking, notifications, HTML, profiles,
+  Docker) and a `tutorial.md` walkthrough; configuration/usage/output-format
+  updates.
+- Tests for the lockfile, notification rendering + channels + dispatch gating,
+  the HTML renderer, and profile/notification config parsing.
+
 ### Milestone 1 — Host & service discovery (complete)
 
 Exit criteria met: `myinventory scan` on a real /24 yields hosts plus named

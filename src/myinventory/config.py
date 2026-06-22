@@ -128,6 +128,55 @@ class EnrichmentConfig:
 
 
 @dataclass
+class WebhookTarget:
+    """An HTTP endpoint to POST a change summary to.
+
+    ``format`` is ``json`` (a generic ``{title, summary, body, diff}`` payload)
+    or ``slack`` (``{"text": ...}`` for Slack/Mattermost incoming webhooks).
+    """
+
+    url: str
+    format: str = "json"  # "json" | "slack"
+    timeout: float = 10.0
+    headers: dict[str, str] = field(default_factory=dict)
+
+
+@dataclass
+class EmailTarget:
+    """SMTP settings for emailing a change summary.
+
+    ``password`` accepts an ``env:``/``file:`` reference like any other secret.
+    Auth is attempted only when ``username`` is set; ``use_tls`` turns on
+    STARTTLS.
+    """
+
+    host: str
+    sender: str
+    recipients: list[str] = field(default_factory=list)
+    port: int = 25
+    username: str | None = None
+    password: str | None = None
+    use_tls: bool = False
+    subject_prefix: str = ""
+
+
+@dataclass
+class NotificationsConfig:
+    """Milestone-6 change notifications. Opt-in and best-effort.
+
+    When ``enabled`` and (by default) the scan actually changed something, a
+    summary is dispatched to every configured webhook and the email target. A
+    failing channel is recorded as a scan error, never fatal.
+    """
+
+    enabled: bool = False
+    #: Only notify when the diff against the previous scan is non-empty.
+    on_change_only: bool = True
+    webhooks: list[WebhookTarget] = field(default_factory=list)
+    email: EmailTarget | None = None
+
+
+@dataclass
 class StorageConfig:
     """Where and how the inventory is persisted (Milestone 5).
 
@@ -152,16 +201,44 @@ class AppConfig:
     service_probes: list[str] = field(default_factory=lambda: ["banner"])
     enrichment: EnrichmentConfig = field(default_factory=EnrichmentConfig)
     storage: StorageConfig = field(default_factory=StorageConfig)
+    notifications: NotificationsConfig = field(default_factory=NotificationsConfig)
     workers: int = 64
     output_dir: str = "./out"
+    #: Label for the scanned estate (a site/profile name), used in output titles
+    #: and notification subjects. Set directly or via a selected profile.
+    site: str | None = None
 
     @classmethod
-    def load(cls, path: str | Path) -> AppConfig:
+    def load(cls, path: str | Path, *, profile: str | None = None) -> AppConfig:
+        """Load config, optionally overlaying a named ``profiles`` entry.
+
+        A config may define ``profiles: {name: {<overrides>}}``; selecting one
+        deep-merges its keys over the base document so several sites can share a
+        single file. The chosen name also becomes the default ``site`` label.
+        """
         path = Path(path)
         if not path.exists():
             raise ConfigError(f"config file not found: {path}")
         data = yaml.safe_load(path.read_text()) or {}
+        profiles = data.pop("profiles", {}) or {}
+        if profile is not None:
+            if profile not in profiles:
+                available = ", ".join(sorted(profiles)) or "(none)"
+                raise ConfigError(
+                    f"unknown profile {profile!r}; available: {available}"
+                )
+            data = _deep_merge(data, profiles[profile])
+            data.setdefault("site", profile)
         return cls.from_dict(data)
+
+    @classmethod
+    def profile_names(cls, path: str | Path) -> list[str]:
+        """Return the profile names declared in ``path`` (empty if none)."""
+        path = Path(path)
+        if not path.exists():
+            raise ConfigError(f"config file not found: {path}")
+        data = yaml.safe_load(path.read_text()) or {}
+        return sorted((data.get("profiles") or {}).keys())
 
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> AppConfig:
@@ -175,8 +252,10 @@ class AppConfig:
             service_probes=data.get("service_probes", ["banner"]),
             enrichment=_enrichment(data.get("enrichment", {})),
             storage=_storage(data.get("storage", {})),
+            notifications=_notifications(data.get("notifications", {})),
             workers=int(data.get("workers", 64)),
             output_dir=data.get("output_dir", "./out"),
+            site=data.get("site"),
         )
 
 
@@ -257,6 +336,53 @@ def _storage(data: dict[str, Any]) -> StorageConfig:
     )
 
 
+def _notifications(data: dict[str, Any]) -> NotificationsConfig:
+    if not isinstance(data, dict):
+        raise ConfigError("'notifications' must be a mapping")
+    email_data = data.get("email")
+    return NotificationsConfig(
+        enabled=bool(data.get("enabled", False)),
+        on_change_only=bool(data.get("on_change_only", True)),
+        webhooks=[_webhook(w) for w in data.get("webhooks", [])],
+        email=_email(email_data) if email_data else None,
+    )
+
+
+def _webhook(data: dict[str, Any]) -> WebhookTarget:
+    if not isinstance(data, dict) or "url" not in data:
+        raise ConfigError("each notifications.webhooks entry requires a 'url'")
+    fmt = str(data.get("format", "json"))
+    if fmt not in ("json", "slack"):
+        raise ConfigError(f"unsupported webhook format {fmt!r}; use 'json' or 'slack'")
+    return WebhookTarget(
+        url=data["url"],
+        format=fmt,
+        timeout=float(data.get("timeout", 10.0)),
+        headers=dict(data.get("headers", {})),
+    )
+
+
+def _email(data: dict[str, Any]) -> EmailTarget:
+    if not isinstance(data, dict):
+        raise ConfigError("'notifications.email' must be a mapping")
+    for required in ("host", "sender"):
+        if required not in data:
+            raise ConfigError(f"notifications.email requires '{required}'")
+    recipients = data.get("recipients") or data.get("to") or []
+    if isinstance(recipients, str):
+        recipients = [recipients]
+    return EmailTarget(
+        host=data["host"],
+        sender=data["sender"],
+        recipients=list(recipients),
+        port=int(data.get("port", 25)),
+        username=data.get("username"),
+        password=_resolve_secret(data.get("password")),
+        use_tls=bool(data.get("use_tls", False)),
+        subject_prefix=str(data.get("subject_prefix", "")),
+    )
+
+
 def _snmp(data: dict[str, Any]) -> SnmpConfig:
     if not isinstance(data, dict):
         raise ConfigError("'enrichment.snmp' must be a mapping")
@@ -285,6 +411,23 @@ def _rule(data: dict[str, Any]) -> ClassificationRule:
         vendor_contains=data.get("vendor_contains"),
         hostname_regex=data.get("hostname_regex"),
     )
+
+
+def _deep_merge(base: dict[str, Any], overlay: dict[str, Any]) -> dict[str, Any]:
+    """Recursively merge ``overlay`` onto ``base``, returning a new dict.
+
+    Nested mappings merge key-by-key; every other value (including lists) is
+    replaced wholesale by the overlay. Used to overlay a profile on the base
+    config without mutating either source.
+    """
+    result = dict(base)
+    for key, value in overlay.items():
+        existing = result.get(key)
+        if isinstance(existing, dict) and isinstance(value, dict):
+            result[key] = _deep_merge(existing, value)
+        else:
+            result[key] = value
+    return result
 
 
 def _resolve_secret(ref: object) -> str | None:

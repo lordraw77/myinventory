@@ -174,14 +174,37 @@ with the same data available from either the JSON or SQLite backend.
 
 ---
 
-## Milestone 6 — Operability & polish (`v1.0`)
+## Milestone 6 — Operability & polish (`v1.0`) ☑
 
-- ☐ Scheduled scans (systemd timer / cron recipe) + lockfile.
-- ☐ Notifications on change (webhook / email) — opt-in.
-- ☐ HTML output (render D2 → SVG and assemble a static site).
-- ☐ Config profiles / multiple sites.
-- ☐ Hardening pass, packaging to PyPI, `pipx` install, container image.
-- ☐ Comprehensive docs pass + tutorial walkthrough.
+Make a working census something you can run unattended: scheduled, locked,
+notifying, publishable and reproducible in a container. The operability surface
+lives in [operations.md](operations.md), with deploy recipes under
+[`deploy/`](../deploy/).
+
+- ☑ Scheduled scans (systemd timer / cron recipe) + lockfile. The CLI takes an
+  advisory, PID-stamped lock at `<out>/.myinventory.lock` ([`lock.py`](../src/myinventory/lock.py))
+  so an overrunning scheduled scan backs off instead of racing itself; stale
+  locks (dead PID) are reclaimed. Units in [`deploy/`](../deploy/).
+- ☑ Notifications on change (webhook / email) — opt-in. After a scan the diff
+  against the previous snapshot is dispatched to Slack/JSON webhooks and SMTP
+  email ([`notify/`](../src/myinventory/notify/)); stdlib-only, best-effort,
+  off by default.
+- ☑ HTML output: `render --html` assembles a self-contained static site
+  ([`render/html.py`](../src/myinventory/render/html.py)), embedding the network
+  diagram as SVG when the `d2` binary is present and degrading gracefully when
+  it is not.
+- ☑ Config profiles / multiple sites — `profiles:` overlays selected with
+  `--profile`, plus a `site` label that flows into HTML titles and notification
+  subjects.
+- ☑ Hardening pass + container image ([`Dockerfile`](../Dockerfile), runs
+  unprivileged, bundles all backends + `d2`). *(PyPI/`pipx` publishing
+  deliberately deferred — install from source or the image for now.)*
+- ☑ Comprehensive docs pass + tutorial walkthrough ([tutorial.md](tutorial.md),
+  [operations.md](operations.md)).
+
+**Exit criteria:** a systemd timer runs a locked nightly scan that publishes an
+HTML site and pings a webhook when the LAN changes — all from one config that can
+describe several sites.
 
 ---
 
