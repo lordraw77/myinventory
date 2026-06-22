@@ -101,9 +101,11 @@ def _cmd_report(args: argparse.Namespace) -> int:
 def _cmd_list(args: argparse.Namespace) -> int:
     inventory = Inventory.from_json(Path(args.inp).read_text())
     print(f"inventory generated {inventory.generated_at}")
-    print(f"  networks: {len(inventory.networks)}")
-    print(f"  hosts:    {len(inventory.hosts)}")
-    print(f"  vms:      {len(inventory.vms)}")
+    print(f"  networks:   {len(inventory.networks)}")
+    print(f"  hosts:      {len(inventory.hosts)}")
+    print(f"  vms:        {len(inventory.vms)}")
+    print(f"  containers: {sum(len(h.containers) for h in inventory.hosts.values())}")
+    print(f"  packages:   {sum(len(h.packages) for h in inventory.hosts.values())}")
     for host in sorted(inventory.hosts.values(), key=lambda h: h.primary_address or ""):
         label = host.hostname or host.primary_address or host.id
         svc = ", ".join(sorted({s.name or s.key for s in host.services}))

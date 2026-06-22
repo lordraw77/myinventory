@@ -7,6 +7,7 @@ from enum import Enum
 from typing import Any
 
 from .service import Service
+from .software import Container, Package, Process
 
 
 class HostRole(str, Enum):
@@ -50,6 +51,11 @@ class Host:
     services: list[Service] = field(default_factory=list)
     tags: list[str] = field(default_factory=list)
     sources: list[DiscoverySource] = field(default_factory=list)
+
+    # Deep-inspection inventory (populated by the SSH inspectors; see M3).
+    packages: list[Package] = field(default_factory=list)
+    processes: list[Process] = field(default_factory=list)
+    containers: list[Container] = field(default_factory=list)
 
     # Relationships (populated by virtualization backends + correlation).
     hypervisor_id: str | None = None  # set when this host is a VM
@@ -107,6 +113,9 @@ class Host:
             "services": [s.to_dict() for s in self.services],
             "tags": self.tags,
             "sources": [s.value for s in self.sources],
+            "packages": [p.to_dict() for p in self.packages],
+            "processes": [p.to_dict() for p in self.processes],
+            "containers": [c.to_dict() for c in self.containers],
             "hypervisor_id": self.hypervisor_id,
             "hosted_vm_ids": self.hosted_vm_ids,
             "first_seen": self.first_seen,
@@ -126,6 +135,9 @@ class Host:
             services=[Service.from_dict(s) for s in data.get("services", [])],
             tags=list(data.get("tags", [])),
             sources=[DiscoverySource(s) for s in data.get("sources", [])],
+            packages=[Package.from_dict(p) for p in data.get("packages", [])],
+            processes=[Process.from_dict(p) for p in data.get("processes", [])],
+            containers=[Container.from_dict(c) for c in data.get("containers", [])],
             hypervisor_id=data.get("hypervisor_id"),
             hosted_vm_ids=list(data.get("hosted_vm_ids", [])),
             first_seen=data.get("first_seen"),

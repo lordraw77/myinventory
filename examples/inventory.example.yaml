@@ -65,9 +65,10 @@ hypervisors:
   #   type: libvirt
   #   host: qemu+ssh://root@192.168.1.30/system
 
-# --- Linux servers to inspect over SSH (roadmap M3) ------------------------
+# --- Linux servers to inspect over SSH -------------------------------------
 # Read-only deep inspection: OS, installed packages, processes, systemd units
-# and Docker/Podman containers. Secrets use env:/file: references — never inline.
+# and Docker/Podman containers (needs the [ssh] extra). Every command is screened
+# against a read-only allow-list; sudo is opt-in. Secrets use env:/file: refs.
 linux_ssh:
   - name: app-1
     host: 192.168.1.20

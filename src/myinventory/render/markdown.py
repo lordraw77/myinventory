@@ -48,6 +48,8 @@ class MarkdownRenderer:
             f"| Hosts | {len(inv.hosts)} |",
             f"| Virtual machines | {len(inv.vms)} |",
             f"| Services | {sum(len(h.services) for h in inv.hosts.values())} |",
+            f"| Containers | {sum(len(h.containers) for h in inv.hosts.values())} |",
+            f"| Packages | {sum(len(h.packages) for h in inv.hosts.values())} |",
             "",
         ]
 
@@ -102,6 +104,10 @@ class MarkdownRenderer:
             f"| MAC | {host.mac or '—'} |",
             f"| Role | {host.role.value} |",
             f"| OS | {host.os or '—'} |",
+            f"| Kernel | {host.extra.get('kernel_release') or '—'} |",
+            f"| Arch | {host.extra.get('arch') or '—'} |",
+            f"| Uptime | {host.extra.get('uptime') or '—'} |",
+            f"| Virtualization | {host.extra.get('virt') or '—'} |",
             f"| Tags | {', '.join(host.tags) or '—'} |",
             f"| First seen | {host.first_seen or '—'} |",
             f"| Last seen | {host.last_seen or '—'} |",
@@ -144,7 +150,56 @@ class MarkdownRenderer:
                     "",
                 ]
 
+        lines += self._containers_section(host)
+        lines += self._packages_section(host)
+        lines += self._processes_section(host)
+
         return "\n".join(lines).rstrip() + "\n"
+
+    # --- deep-inspection sections (M3) ------------------------------------
+    @staticmethod
+    def _containers_section(host: Host) -> list[str]:
+        if not host.containers:
+            return []
+        lines = ["## Containers", "",
+                 "| Container | Image | State | Ports | Project |",
+                 "| --- | --- | --- | --- | --- |"]
+        for c in sorted(host.containers, key=lambda x: x.name):
+            ports = ", ".join(c.ports) or "—"
+            lines.append(
+                f"| {c.name} | {c.image or '—'} | {c.state or '—'} | "
+                f"{ports} | {c.compose_project or '—'} |"
+            )
+        lines.append("")
+        return lines
+
+    @staticmethod
+    def _packages_section(host: Host) -> list[str]:
+        if not host.packages:
+            return []
+        lines = [f"## Packages ({len(host.packages)})", "",
+                 "| Package | Version | Manager |",
+                 "| --- | --- | --- |"]
+        for p in sorted(host.packages, key=lambda x: x.name.lower()):
+            lines.append(f"| {p.name} | {p.version or '—'} | {p.manager} |")
+        lines.append("")
+        return lines
+
+    @staticmethod
+    def _processes_section(host: Host) -> list[str]:
+        if not host.processes:
+            return []
+        lines = ["## Top processes", "",
+                 "| PID | User | %CPU | RSS (KB) | Command | Listening |",
+                 "| ---: | --- | ---: | ---: | --- | --- |"]
+        for p in host.processes:
+            ports = ", ".join(str(x) for x in p.listening_ports) or "—"
+            lines.append(
+                f"| {p.pid} | {p.user or '—'} | {p.cpu_percent if p.cpu_percent is not None else '—'} | "
+                f"{p.rss_kb if p.rss_kb is not None else '—'} | {p.name} | {ports} |"
+            )
+        lines.append("")
+        return lines
 
     @staticmethod
     def _write(path: Path, content: str) -> Path:

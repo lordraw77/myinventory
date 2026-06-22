@@ -132,6 +132,13 @@ def _merge_host(target: Host, incoming: Host) -> None:
     for svc in incoming.services:
         target.add_service(svc)
 
+    # Deep-inspection collections come from a single authoritative SSH pass, so
+    # a non-empty incoming set replaces the prior one rather than unioning.
+    for attr in ("packages", "processes", "containers"):
+        val = getattr(incoming, attr)
+        if val:
+            setattr(target, attr, val)
+
     target.extra.update(incoming.extra)
 
 

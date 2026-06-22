@@ -24,14 +24,20 @@ is reachable on the network.
 | `addresses` | `List[str]` | IPv4/IPv6 addresses; `addresses[0]` is primary. |
 | `hostname` | `str?` | DNS / reported name. |
 | `mac` | `str?` | Normalized lower-case, colon-separated. |
-| `role` | `HostRole` | `unknown`/`physical`/`hypervisor`/`vm`/`network`/`nas`/… |
+| `role` | `HostRole` | `unknown`/`physical`/`hypervisor`/`vm`/`container`/`network`/`nas`/… |
 | `os` | `str?` | Best-effort OS string. |
 | `services` | `List[Service]` | Keyed internally by `proto/port`. |
 | `tags` | `List[str]` | Free-form classification. |
 | `sources` | `List[DiscoverySource]` | How it was found (`tcp`, `arp`, `virtualization`…). |
+| `packages` | `List[Package]` | Installed software (SSH deep inspection). |
+| `processes` | `List[Process]` | Notable running processes (SSH deep inspection). |
+| `containers` | `List[Container]` | Containers reported by the host's runtime. |
 | `hypervisor_id` | `str?` | Set when this host is a VM, links to its hypervisor. |
 | `hosted_vm_ids` | `List[str]` | Set on a hypervisor. |
 | `first_seen` / `last_seen` | `str?` | ISO-8601 UTC timestamps. |
+
+OS facts gathered over SSH (kernel release, arch, uptime, virtualization hint,
+`systemd_units`, package count) are stored under `extra`.
 
 ### Identity
 
@@ -75,6 +81,26 @@ A guest enumerated from a virtualization backend.
 | `guest_os` | `str?` | As reported by the hypervisor / guest agent. |
 | `addresses`/`mac_addresses` | `List[str]` | Used for correlation to a `Host`. |
 | `host_id` | `str?` | Set by correlation when the guest is also a discovered host. |
+
+## Package, Process, Container
+
+Deep-inspection records produced by the SSH inspectors (M3); they hang off a
+`Host`.
+
+**Package** — installed software normalized across managers: `name`,
+`version?`, `manager` (`dpkg`/`rpm`/`snap`/`flatpak`).
+
+**Process** — a notable running process: `pid`, `name`, `user?`,
+`cpu_percent?`, `rss_kb?`, `command?`, and `listening_ports` (filled by
+socket↔process correlation, so the host page shows which process owns each open
+port).
+
+**Container** — a container reported by the host's runtime: `id`, `name`,
+`image?`, `state?`, `runtime` (`docker`/`podman`), `ports`, `mounts`,
+`restart_policy?`, `compose_project?`, `labels`. `published_ports` maps the
+host-side ports back to the host's network-discovered services, so
+`host:8080 → nginx` links to `container web-1 → nginx:1.25`. Containers render
+nested under their host in `containers.d2`, mirroring the hypervisor→VM view.
 
 ## Network
 

@@ -9,6 +9,7 @@ from .host import DiscoverySource, Host, HostRole
 from .inventory import Inventory
 from .network import Network
 from .service import Service
+from .software import Container, Package, Process
 from .vm import PowerState, VirtualMachine
 
 __all__ = [
@@ -16,6 +17,9 @@ __all__ = [
     "Host",
     "HostRole",
     "DiscoverySource",
+    "Package",
+    "Process",
+    "Container",
     "VirtualMachine",
     "PowerState",
     "Network",

@@ -5,7 +5,9 @@ Stages, in order:
 1. **Host discovery** — run each configured discovery backend over each network.
 2. **Service discovery** — run each configured probe over every discovered host.
 3. **Virtualization** — run each hypervisor backend; add hypervisor hosts + VMs.
-4. **Correlation** — link VMs to network-discovered hosts and to their
+4. **Linux inspection** — for each ``linux_ssh`` target, log in read-only over
+   SSH and inventory packages, processes, systemd units and containers.
+5. **Correlation** — link VMs to network-discovered hosts and to their
    hypervisor node.
 
 Every plugin call is wrapped so a failure becomes a recorded error instead of an
@@ -17,9 +19,9 @@ from __future__ import annotations
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
-from ..config import AppConfig, HypervisorTarget, NetworkTarget
+from ..config import AppConfig, HypervisorTarget, LinuxSshTarget, NetworkTarget
 from ..discovery import DiscoveryResult, get_discovery
-from ..models import HostRole, Inventory, Network
+from ..models import Host, HostRole, Inventory, Network
 from ..services import get_probe
 from ..virtualization import BackendResult, get_backend
 
@@ -31,6 +33,8 @@ class ScanReport:
     hosts_found: int = 0
     services_found: int = 0
     vms_found: int = 0
+    packages_found: int = 0
+    containers_found: int = 0
     errors: list[str] = field(default_factory=list)
 
     def __str__(self) -> str:
@@ -38,6 +42,11 @@ class ScanReport:
             f"{self.hosts_found} hosts, {self.services_found} services, "
             f"{self.vms_found} VMs"
         )
+        if self.packages_found or self.containers_found:
+            line += (
+                f", {self.packages_found} packages, "
+                f"{self.containers_found} containers"
+            )
         if self.errors:
             line += f" ({len(self.errors)} errors)"
         return line
@@ -54,11 +63,16 @@ class Orchestrator:
         self._discover_hosts(inventory, report)
         self._probe_services(inventory, report)
         self._collect_virtualization(inventory, report)
+        self._inspect_linux(inventory, report)
         self._correlate(inventory)
 
         report.hosts_found = len(inventory.hosts)
         report.services_found = sum(len(h.services) for h in inventory.hosts.values())
         report.vms_found = len(inventory.vms)
+        report.packages_found = sum(len(h.packages) for h in inventory.hosts.values())
+        report.containers_found = sum(
+            len(h.containers) for h in inventory.hosts.values()
+        )
         return inventory, report
 
     # --- stage 1: host discovery -----------------------------------------
@@ -110,7 +124,35 @@ class Orchestrator:
         except Exception as exc:  # noqa: BLE001
             return BackendResult(errors=[f"virt/{target.type} @ {target.host}: {exc}"])
 
-    # --- stage 4: correlation --------------------------------------------
+    # --- stage 4: linux deep inspection over SSH -------------------------
+    def _inspect_linux(self, inventory: Inventory, report: ScanReport) -> None:
+        for target in self.config.linux_ssh:
+            host, errors = self._inspect_one(target)
+            report.errors.extend(errors)
+            if host is not None:
+                inventory.upsert_host(host)
+
+    @staticmethod
+    def _inspect_one(target: LinuxSshTarget) -> tuple[Host | None, list[str]]:
+        # Imported lazily so a base install without the [ssh] extra still runs
+        # the network/virtualization stages.
+        from ..ssh import LinuxInspector, SshTransport
+
+        try:
+            transport = SshTransport(target, strict_host_key=target.strict_host_key)
+            transport.connect()
+        except Exception as exc:  # noqa: BLE001 - fail soft
+            return None, [f"ssh/{target.host}: connect failed: {exc}"]
+        try:
+            inspector = LinuxInspector(transport, target)
+            host = inspector.inspect()
+            return host, inspector.errors
+        except Exception as exc:  # noqa: BLE001 - fail soft
+            return None, [f"ssh/{target.host}: inspection failed: {exc}"]
+        finally:
+            transport.close()
+
+    # --- stage 5: correlation --------------------------------------------
     @staticmethod
     def _correlate(inventory: Inventory) -> None:
         """Cross-link the virtualization view with network discovery.

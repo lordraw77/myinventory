@@ -69,6 +69,9 @@ class LinuxSshTarget:
     sudo_password: str | None = None
     port: int = 22
     name: str | None = None
+    #: Reject hosts missing from known_hosts. Set ``false`` to auto-accept new
+    #: host keys (convenient for a homelab, weaker against MITM).
+    strict_host_key: bool = True
 
 
 @dataclass
@@ -152,6 +155,7 @@ def _linux_ssh(data: dict[str, Any]) -> LinuxSshTarget:
         sudo_password=sudo_password,
         port=int(data.get("port", 22)),
         name=data.get("name"),
+        strict_host_key=bool(data.get("strict_host_key", True)),
     )
 
 

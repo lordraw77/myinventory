@@ -67,7 +67,7 @@ box contains its running VMs, cross-linked to network discovery.
 
 ---
 
-## Milestone 3 — Agentless Linux deep inspection over SSH (`v0.4`)
+## Milestone 3 — Agentless Linux deep inspection over SSH (`v0.4`) ☑
 
 Go beyond "a port is open": log into Linux servers read-only over SSH and
 inventory what actually runs on them — installed software, running processes and
@@ -77,39 +77,40 @@ commands, no software left behind.
 - ☑ Config surface: a `linux_ssh` target block — `username`, `password`,
   `key_file`, `sudo`, `sudo_password`, `port` — with every secret resolved via
   the `env:`/`file:` reference scheme. *(landed early)*
-- ☐ SSH transport layer (paramiko): connect using SSH key/agent and/or
+- ☑ SSH transport layer (paramiko): connect using SSH key/agent and/or
   username+password auth, run privileged commands via `sudo -S` fed the
   configured `sudo_password` (or passwordless sudo), honor `~/.ssh/config`,
-  bastion/jump-host support, strict host-key checking, per-host timeout.
-- ☐ Base OS facts: distro + version (`/etc/os-release`), kernel (`uname`),
+  bastion/jump-host support (`ProxyCommand`), strict host-key checking,
+  per-host timeout.
+- ☑ Base OS facts: distro + version (`/etc/os-release`), kernel (`uname`),
   architecture, uptime, virtualization hint (`systemd-detect-virt`).
-- ☐ **Installed software**: package inventory across managers — `dpkg`/`apt`
+- ☑ **Installed software**: package inventory across managers — `dpkg`/`apt`
   (Debian/Ubuntu), `rpm`/`dnf` (RHEL/Fedora/Rocky), plus `snap`/`flatpak`
   when present. Normalized to `(name, version, manager)`.
-- ☐ **Running processes & listening sockets**: `ss -tulpn` → map each listening
+- ☑ **Running processes & listening sockets**: `ss -tulpn` → map each listening
   port to its owning process/unit, enriching the `Service` records from network
   discovery with the real binary and PID. Top processes by CPU/RSS.
-- ☐ **systemd services**: enabled/running units (`systemctl list-units`) so the
+- ☑ **systemd services**: enabled/running units (`systemctl list-units`) so the
   inventory reflects intended services, not just currently-open ports.
-- ☐ **Docker / container runtime discovery**:
-  - Detect the runtime (docker / podman / containerd) and its version.
-  - Enumerate containers (`docker ps -a` / `podman ps -a` / Docker socket API):
-    name, image + tag/digest, state, ports published to the host, mounts,
-    restart policy, compose project/labels.
-  - Enumerate local images, networks and named volumes.
+- ☑ **Docker / container runtime discovery**:
+  - Detect the runtime (docker / podman) and its version.
+  - Enumerate containers (`docker ps -a` / `podman ps -a`): name, image + tag,
+    state, ports published to the host, mounts, restart policy, compose
+    project/labels.
   - Map published container ports back to the host's network-discovered
     services (so "host:8080 → nginx" links to "container web-1 → nginx:1.25").
-- ☐ Data model: add `Package`, `Process`, and `Container` records (a container
-  reuses the `HostRole.CONTAINER` node so it appears in maps/docs, linked to its
-  host the way a VM links to its hypervisor).
-- ☐ Rendering: container nodes nested under their Docker host in D2 (mirroring
-  the hypervisor→VM view); per-host Markdown gains **Packages**, **Processes**
-  and **Containers** sections.
-- ☐ Safety: read-only command allow-list, `sudo` strictly opt-in (off unless
-  configured) and used only for the commands that require it, configurable
-  command set, graceful degradation when a command is missing.
-- ☐ Integration test against a docker-compose lab (a Linux box running a couple
-  of containers) asserting containers + packages are discovered.
+  - *(Local images/networks/volumes enumeration deferred — backlog.)*
+- ☑ Data model: added `Package`, `Process`, and `Container` records (containers
+  render as nodes nested under their host, the way a VM nests under its
+  hypervisor; `HostRole.CONTAINER` styles them).
+- ☑ Rendering: container nodes nested under their Docker host in D2
+  (`containers.d2`, mirroring the hypervisor→VM view); per-host Markdown gains
+  **Packages**, **Processes** and **Containers** sections.
+- ☑ Safety: read-only command allow-list, `sudo` strictly opt-in (off unless
+  configured) and used only for the commands that require it (sockets, runtime),
+  graceful degradation when a command is missing.
+- ☑ Integration test against a fake runner (in-process stand-in for the
+  docker-compose lab) asserting containers + packages are discovered.
 
 **Exit criteria:** pointing `myinventory` at a Linux host with Docker yields its
 OS, installed packages, running services and a list of containers — rendered in

@@ -115,7 +115,16 @@ Guest IP/MAC discovery is best-effort across all backends: a VM whose guest agen
 ## `linux_ssh[]`
 
 Linux hosts to inspect read-only over SSH (deep inspection — OS, packages,
-processes, systemd units, Docker/Podman containers; roadmap M3).
+processes, systemd units, Docker/Podman containers). Needs the `ssh` extra
+(`pip install 'myinventory[ssh]'`).
+
+Every command is screened against a read-only allow-list before it runs; `sudo`
+is opt-in and used only for the commands that need it (listening-socket→process
+mapping and the container runtime). Host-key checking is strict by default (the
+host must be in `/etc/ssh/ssh_known_hosts` or your `~/.ssh/known_hosts`), and
+`~/.ssh/config` is honored — including a `ProxyJump`/`ProxyCommand` entry for
+bastion hosts. Set `strict_host_key: false` to auto-accept unknown host keys
+(convenient on a homelab, weaker against MITM).
 
 ```yaml
 linux_ssh:
@@ -138,6 +147,7 @@ linux_ssh:
 | `sudo` | | `false`¹ | Run privileged commands through `sudo -S`. |
 | `sudo_password` | | — | Password piped to `sudo -S` (secret reference). Omit for passwordless sudo. |
 | `port` | | `22` | SSH port. |
+| `strict_host_key` | | `true` | Reject hosts not in a known_hosts file. `false` auto-accepts. |
 
 ¹ `sudo` defaults to `true` automatically when a `sudo_password` is supplied.
 
