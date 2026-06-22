@@ -30,21 +30,21 @@ valid D2 + Markdown.
 
 ---
 
-## Milestone 1 — Host & service discovery (`v0.2`)
+## Milestone 1 — Host & service discovery (`v0.2`) ☑
 
 Make the scan real on a LAN.
 
-- ☐ ICMP ping-sweep discovery backend.
-- ☐ ARP-scan discovery backend (local segment).
-- ☐ TCP-connect discovery backend (firewall-friendly).
-- ☐ Port scanner + banner grabber.
-- ☐ Service signature table (ssh, http/https, postgres, mysql, redis, smb,
+- ☑ ICMP ping-sweep discovery backend.
+- ☑ ARP-scan discovery backend (local segment).
+- ☑ TCP-connect discovery backend (firewall-friendly).
+- ☑ Port scanner + banner grabber.
+- ☑ Service signature table (ssh, http/https, postgres, mysql, redis, smb,
   rdp, dns, snmp, …) with version extraction.
-- ☐ Optional `nmap` backend (used when the binary is present).
-- ☐ Orchestrator: thread pool, per-target timeout, rate limiting, error
+- ☑ Optional `nmap` backend (used when the binary is present).
+- ☑ Orchestrator: thread pool, per-target timeout, rate limiting, error
   collection.
-- ☐ Integration test against a containerized lab (docker-compose of fake
-  services).
+- ☑ Integration test against fake services (in-process TCP lab; a
+  docker-compose variant remains a future nicety).
 
 **Exit criteria:** `myinventory scan` on a real /24 yields hosts + named
 services and renders a usable map.

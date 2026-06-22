@@ -30,6 +30,10 @@ class NetworkTarget:
     probe_ports: list[int] | None = None
     timeout: float = 0.5
     workers: int = 128
+    #: Max probes per second across the sweep (0 = unlimited).
+    rate_limit: float = 0.0
+    #: Overall wall-clock budget for one network's sweep, in seconds (None = no cap).
+    target_timeout: float | None = None
 
 
 @dataclass
@@ -104,6 +108,7 @@ class AppConfig:
 def _network(data: dict[str, Any]) -> NetworkTarget:
     if "cidr" not in data:
         raise ConfigError("each network entry requires a 'cidr'")
+    target_timeout = data.get("target_timeout")
     return NetworkTarget(
         cidr=data["cidr"],
         name=data.get("name"),
@@ -112,6 +117,8 @@ def _network(data: dict[str, Any]) -> NetworkTarget:
         probe_ports=data.get("probe_ports"),
         timeout=float(data.get("timeout", 0.5)),
         workers=int(data.get("workers", 128)),
+        rate_limit=float(data.get("rate_limit", 0.0)),
+        target_timeout=float(target_timeout) if target_timeout is not None else None,
     )
 
 
@@ -148,15 +155,20 @@ def _linux_ssh(data: dict[str, Any]) -> LinuxSshTarget:
     )
 
 
-def _resolve_secret(ref: str | None) -> str | None:
+def _resolve_secret(ref: object) -> str | None:
     """Resolve a secret reference.
 
     * ``env:NAME``   -> value of environment variable ``NAME``
     * ``file:/path`` -> contents of the file (trimmed)
-    * anything else  -> returned as-is (discouraged; emits no error here)
+    * anything else  -> returned as-is, stringified (discouraged; emits no error)
+
+    Accepts any scalar because YAML happily parses a bare numeric password as an
+    ``int`` — we coerce it to ``str`` rather than crashing.
     """
-    if not ref:
+    if ref is None or ref == "":
         return None
+    if not isinstance(ref, str):
+        return str(ref)
     if ref.startswith("env:"):
         name = ref[4:]
         val = os.environ.get(name)

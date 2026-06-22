@@ -12,7 +12,7 @@ import socket
 
 from ...models import Host, Service
 from ..base import ServiceProbe, register_probe
-from .signatures import BANNER_SIGNATURES, WELL_KNOWN_PORTS
+from .signatures import WELL_KNOWN_PORTS, identify
 
 # Ports the probe will try when the host has no known-open ports yet.
 DEFAULT_PORTS = sorted(WELL_KNOWN_PORTS)
@@ -52,21 +52,14 @@ class BannerProbe(ServiceProbe):
             return None
 
         banner = raw.decode("latin-1", errors="replace").strip()
-        name, product = self._match(banner, port)
+        name, product, version = identify(banner, port)
         return Service(
             port=port,
             protocol="tcp",
             name=name,
-            product=product or None,
+            product=product,
+            version=version,
             state="open",
             banner=banner or None,
             source="banner",
         )
-
-    @staticmethod
-    def _match(banner: str, port: int) -> tuple[str | None, str]:
-        low = banner.lower()
-        for needle, (name, product) in BANNER_SIGNATURES.items():
-            if needle in low:
-                return name, product
-        return WELL_KNOWN_PORTS.get(port), ""

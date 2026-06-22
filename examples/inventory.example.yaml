@@ -16,9 +16,16 @@ networks:
   - name: lan
     cidr: 192.168.1.0/24
     vlan: 1
-    discovery: [tcp]          # tcp | icmp | arp (icmp/arp need the [scan] extra)
+    # Backends run in order and their results merge by stable host ID:
+    #   tcp  - connect-scan, firewall-friendly, no root, no deps (default)
+    #   icmp - ping-sweep via the system 'ping', no root, no deps
+    #   arp  - read the kernel neighbour table to add MAC addresses
+    #   nmap - host + service/version detection (needs the [scan] extra + binary)
+    discovery: [tcp, arp]
     timeout: 0.5              # per-connection timeout, seconds
-    workers: 128              # parallelism for this subnet's sweep
+    workers: 128             # parallelism for this subnet's sweep
+    rate_limit: 0            # max probes/second across the sweep (0 = unlimited)
+    target_timeout: 120      # optional wall-clock budget for this subnet, seconds
 
   - name: dmz
     cidr: 10.0.10.0/24

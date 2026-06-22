@@ -6,7 +6,34 @@ versioning.
 
 ## [Unreleased]
 
-Milestone 0 — Foundations (complete, see [docs/roadmap.md](docs/roadmap.md)).
+### Milestone 1 — Host & service discovery (complete)
+
+Exit criteria met: `myinventory scan` on a real /24 yields hosts plus named
+services and renders a usable map.
+
+#### Added
+- `icmp` discovery backend: ping-sweep via the system `ping` (no root, no deps).
+- `arp` discovery backend: reads the kernel neighbour table (`ip neigh` with a
+  `/proc/net/arp` fallback) to annotate local-segment hosts with their MAC.
+- `nmap` discovery backend (optional, `[scan]` extra): host discovery plus
+  service/version fingerprinting; degrades gracefully when the binary/module is
+  absent.
+- Service signatures rewritten with regex **version extraction** (`OpenSSH_9.6p1`
+  → `9.6p1`, `nginx/1.25` → `1.25`) and an expanded port/banner table.
+- Rate limiting (`rate_limit`) and per-target timeout (`target_timeout`) per
+  network, applied through a shared, thread-pooled `sweep` helper.
+- Tests: signature/version extraction, discovery backends, the sweep helper, and
+  an in-process integration lab (real TCP service + banner probe).
+
+#### Fixed
+- Discovery backends now key hosts by **address** so `tcp`/`icmp`/`arp`/`nmap`
+  results for the same machine merge into one record (the MAC from `arp` enriches
+  it) instead of producing duplicates.
+- Config loading no longer crashes when YAML parses a bare numeric password as an
+  `int`: any non-string scalar secret is coerced to `str`.
+
+### Milestone 0 — Foundations (complete)
+
 Exit criteria met: `myinventory render --in fixtures/inventory.json` produces
 valid D2 diagrams and Markdown documentation.
 
