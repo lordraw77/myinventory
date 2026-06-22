@@ -18,8 +18,8 @@ DETECT_VIRT = "systemd-detect-virt"
 
 # Installed software, per package manager. The inspector picks by detected OS
 # and falls back gracefully when a binary is absent.
-DPKG = r"dpkg-query -W -f=${Package}\t${Version}\n"
-RPM = r"rpm -qa --qf %{NAME}\t%{VERSION}-%{RELEASE}\n"
+DPKG = r"dpkg-query -W -f='${Package}\t${Version}\n'"
+RPM = r"rpm -qa --qf '%{NAME}\t%{VERSION}-%{RELEASE}\n'"
 SNAP = "snap list"
 FLATPAK = "flatpak list --columns=application,version"
 

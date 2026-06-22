@@ -5,18 +5,14 @@ from __future__ import annotations
 import json
 from collections.abc import Iterable
 from dataclasses import dataclass, field
-from datetime import datetime, timezone
 from typing import Any
 
+from ..timeutil import now_iso as _now
 from .host import Host
 from .network import Network
 from .vm import VirtualMachine
 
 SCHEMA_VERSION = 1
-
-
-def _utcnow() -> str:
-    return datetime.now(timezone.utc).replace(microsecond=0).isoformat()
 
 
 @dataclass
@@ -30,7 +26,7 @@ class Inventory:
     hosts: dict[str, Host] = field(default_factory=dict)
     vms: dict[str, VirtualMachine] = field(default_factory=dict)
     networks: list[Network] = field(default_factory=list)
-    generated_at: str = field(default_factory=_utcnow)
+    generated_at: str = field(default_factory=_now)
     schema_version: int = SCHEMA_VERSION
 
     # --- mutation ---------------------------------------------------------
@@ -38,7 +34,7 @@ class Inventory:
         """Insert ``host`` or merge it into an existing record (last wins)."""
         existing = self.hosts.get(host.id)
         if existing is None:
-            host.first_seen = host.first_seen or _utcnow()
+            host.first_seen = host.first_seen or _now()
             host.last_seen = host.last_seen or host.first_seen
             self.hosts[host.id] = host
             return host
@@ -91,7 +87,7 @@ class Inventory:
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> Inventory:
         inv = cls(
-            generated_at=data.get("generated_at", _utcnow()),
+            generated_at=data.get("generated_at", _now()),
             schema_version=int(data.get("schema_version", SCHEMA_VERSION)),
         )
         inv.networks = [Network.from_dict(n) for n in data.get("networks", [])]
@@ -113,7 +109,7 @@ class Inventory:
 
 def _merge_host(target: Host, incoming: Host) -> None:
     """Field-level merge: prefer non-empty incoming values, union lists."""
-    target.last_seen = _utcnow()
+    target.last_seen = _now()
     target.first_seen = target.first_seen or incoming.first_seen
 
     for attr in ("hostname", "mac", "os", "hypervisor_id"):

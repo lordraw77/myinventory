@@ -16,10 +16,10 @@ Two backends implement the same interface: :class:`JsonInventoryRepository`
 from __future__ import annotations
 
 from abc import ABC, abstractmethod
-from datetime import datetime, timezone
 from pathlib import Path
 
 from ..models import Inventory
+from ..timeutil import snapshot_stamp as _snapshot_stamp
 
 
 class InventoryRepository(ABC):
@@ -73,11 +73,6 @@ class InventoryRepository(ABC):
             merged = inventory
         self.save(merged)
         return merged
-
-
-def _snapshot_stamp() -> str:
-    """A filesystem- and id-safe UTC stamp, e.g. ``20260622T143005Z``."""
-    return datetime.now(timezone.utc).strftime("%Y%m%dT%H%M%SZ")
 
 
 class JsonInventoryRepository(InventoryRepository):

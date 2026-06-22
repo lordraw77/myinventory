@@ -18,6 +18,7 @@ aborted census.
 
 from __future__ import annotations
 
+import logging
 from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
 
@@ -27,6 +28,8 @@ from ..enrich import ENRICHMENT_ORDER, get_enricher
 from ..models import Host, HostRole, Inventory, Network
 from ..services import get_probe
 from ..virtualization import BackendResult, get_backend
+
+log = logging.getLogger(__name__)
 
 
 @dataclass
@@ -66,6 +69,12 @@ class Orchestrator:
         inventory = Inventory()
         report = ScanReport()
 
+        log.info(
+            "scan starting: %d network(s), %d hypervisor(s), %d ssh target(s)",
+            len(self.config.networks),
+            len(self.config.hypervisors),
+            len(self.config.linux_ssh),
+        )
         self._discover_hosts(inventory, report)
         self._probe_services(inventory, report)
         self._collect_virtualization(inventory, report)
@@ -80,6 +89,7 @@ class Orchestrator:
         report.containers_found = sum(
             len(h.containers) for h in inventory.hosts.values()
         )
+        log.info("scan complete: %s", report)
         return inventory, report
 
     # --- stage 1: host discovery -----------------------------------------
@@ -93,6 +103,12 @@ class Orchestrator:
                 report.errors.extend(result.errors)
                 for host in result.hosts:
                     inventory.upsert_host(host)
+                log.info(
+                    "discovery/%s on %s: %d host(s)",
+                    backend_name,
+                    target.cidr,
+                    len(result.hosts),
+                )
 
     def _run_discovery(self, name: str, target: NetworkTarget) -> DiscoveryResult:
         try:
@@ -103,27 +119,42 @@ class Orchestrator:
     # --- stage 2: service discovery --------------------------------------
     def _probe_services(self, inventory: Inventory, report: ScanReport) -> None:
         hosts = list(inventory.hosts.values())
+        if not self.config.service_probes:
+            return
+        log.info(
+            "probing %d host(s) with: %s",
+            len(hosts),
+            ", ".join(self.config.service_probes),
+        )
         for probe_name in self.config.service_probes:
             try:
                 probe = get_probe(probe_name)
             except Exception as exc:  # noqa: BLE001
                 report.errors.append(f"probe/{probe_name}: {exc}")
+                log.warning("probe/%s unavailable: %s", probe_name, exc)
                 continue
 
+            found = 0
             with ThreadPoolExecutor(max_workers=self.config.workers) as pool:
                 for host, services in zip(hosts, pool.map(probe.probe, hosts)):
                     for svc in services:
                         host.add_service(svc)
+                        found += 1
+            log.debug("probe/%s: %d service(s)", probe_name, found)
 
     # --- stage 3: virtualization -----------------------------------------
     def _collect_virtualization(self, inventory: Inventory, report: ScanReport) -> None:
         for target in self.config.hypervisors:
+            log.info("virt/%s: querying %s", target.type, target.host)
             result = self._run_backend(target)
             report.errors.extend(result.errors)
             for host in result.hosts:
                 inventory.upsert_host(host)
             for vm in result.vms:
                 inventory.upsert_vm(vm)
+            log.info(
+                "virt/%s @ %s: %d VM(s)", target.type, target.host, len(result.vms)
+            )
 
     def _run_backend(self, target: HypervisorTarget) -> BackendResult:
         try:
@@ -134,10 +165,19 @@ class Orchestrator:
     # --- stage 4: linux deep inspection over SSH -------------------------
     def _inspect_linux(self, inventory: Inventory, report: ScanReport) -> None:
         for target in self.config.linux_ssh:
+            log.info("ssh/%s: connecting for deep inspection", target.host)
             host, errors = self._inspect_one(target)
             report.errors.extend(errors)
             if host is not None:
                 inventory.upsert_host(host)
+                log.info(
+                    "ssh/%s: %d package(s), %d container(s)",
+                    target.host,
+                    len(host.packages),
+                    len(host.containers),
+                )
+            else:
+                log.warning("ssh/%s: inspection produced no host", target.host)
 
     @staticmethod
     def _inspect_one(target: LinuxSshTarget) -> tuple[Host | None, list[str]]:
@@ -171,13 +211,16 @@ class Orchestrator:
         for name in ENRICHMENT_ORDER:
             if not gates.get(name):
                 continue
+            log.info("enrich/%s: running", name)
             try:
                 result = get_enricher(name).enrich(inventory, cfg)
             except Exception as exc:  # noqa: BLE001 - one bad pass must not abort
                 report.errors.append(f"enrich/{name}: {exc}")
+                log.warning("enrich/%s failed: %s", name, exc)
                 continue
             report.errors.extend(result.errors)
             report.enriched += result.applied
+            log.info("enrich/%s: %d applied", name, result.applied)
 
     # --- stage 5: correlation --------------------------------------------
     @staticmethod
