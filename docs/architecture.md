@@ -120,6 +120,12 @@ rate limits, collects errors, and merges every plugin's output into a single
 `Inventory`. Correlation lives here too — e.g. matching a VM's reported IP to a
 separately discovered `Host` so the two records link up.
 
+A final **enrichment** stage (`myinventory.enrich`) then runs a fixed pipeline of
+`Enricher` plugins over the merged inventory — `snmp → hostname → fingerprint →
+classify` — each resolving names, OS guesses, vendor and role/tags from a
+different signal and annotating in place. Like the other plugin layers it is a
+registry of fail-soft passes; see [enrichment.md](enrichment.md).
+
 ### 3.7 Storage (`myinventory.storage`)
 Serializes the `Inventory` to `inventory.json` and merges a new scan into a
 prior one using stable IDs (last-seen wins, history preserved). JSON is the
@@ -204,7 +210,9 @@ src/myinventory/
 ├── discovery/             # host discovery plugins (icmp/arp/tcp)
 ├── services/              # service fingerprinting + probes/
 ├── virtualization/        # hypervisor backends + registry
-├── pipeline/              # orchestrator, correlation, errors
+├── ssh/                   # agentless Linux deep inspection over SSH
+├── enrich/                # SNMP, hostname, OS fingerprint, classify
+├── pipeline/              # orchestrator, correlation, enrichment, errors
 ├── storage/               # inventory.json repository + merge
 └── render/                # d2.py, markdown.py
 ```

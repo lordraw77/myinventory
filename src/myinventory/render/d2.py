@@ -25,6 +25,7 @@ _ROLE_STYLE: dict[HostRole, str] = {
     HostRole.VM: "{shape: rectangle; style.fill: \"#dcfce7\"}",
     HostRole.NETWORK: "{shape: hexagon; style.fill: \"#fef9c3\"}",
     HostRole.NAS: "{shape: cylinder; style.fill: \"#f3e8ff\"}",
+    HostRole.PRINTER: "{shape: page; style.fill: \"#fee2e2\"}",
     HostRole.CONTAINER: "{shape: rectangle; style.fill: \"#ffedd5\"}",
     HostRole.UNKNOWN: "{shape: rectangle}",
 }

@@ -109,16 +109,30 @@ def _cmd_list(args: argparse.Namespace) -> int:
     for host in sorted(inventory.hosts.values(), key=lambda h: h.primary_address or ""):
         label = host.hostname or host.primary_address or host.id
         svc = ", ".join(sorted({s.name or s.key for s in host.services}))
-        print(f"  - {label:24} [{host.role.value}] {svc}")
+        tags = f"  {{{', '.join(host.tags)}}}" if host.tags else ""
+        print(f"  - {label:24} [{host.role.value}] {svc}{tags}")
     return 0
 
 
 def _cmd_validate(args: argparse.Namespace) -> int:
     config = AppConfig.load(args.config)
+    enr = config.enrichment
+    passes = [
+        name
+        for name, on in (
+            ("snmp", enr.snmp.enabled),
+            ("hostname", enr.reverse_dns or bool(enr.dhcp_leases)),
+            ("fingerprint", enr.os_fingerprint),
+            ("classify", enr.classify),
+        )
+        if on
+    ]
     print(
         f"config OK: {len(config.networks)} network(s), "
         f"{len(config.hypervisors)} hypervisor(s), "
         f"{len(config.linux_ssh)} linux_ssh target(s), "
-        f"probes={config.service_probes}"
+        f"probes={config.service_probes}, "
+        f"enrichment={passes or ['(none)']}, "
+        f"rules={len(enr.rules)}"
     )
     return 0

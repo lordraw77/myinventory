@@ -118,12 +118,32 @@ both the D2 map and the host's Markdown page.
 
 ---
 
-## Milestone 4 — Enrichment & accuracy (`v0.5`)
+## Milestone 4 — Enrichment & accuracy (`v0.5`) ☑
 
-- ☐ SNMP probe for network appliances (switches, APs, NAS).
-- ☐ OS fingerprint heuristics (TTL, banner, open-port profile).
-- ☐ Reverse-DNS and DHCP-lease hostname resolution.
-- ☐ Tagging/classification rules (role: hypervisor / nas / router / printer…).
+Turn discovered addresses into *identified* hosts. A post-correlation enrichment
+stage ([`enrich/`](../src/myinventory/enrich/)) runs a fixed pipeline —
+`snmp → hostname → fingerprint → classify` — over the merged inventory, each pass
+an `Enricher` plugin that annotates in place and fails soft. See
+[enrichment.md](enrichment.md).
+
+- ☑ SNMP probe for network appliances (switches, APs, NAS): polls the `system`
+  group (`sysDescr`/`sysName`/`sysObjectID`…), names the host, seeds the OS guess
+  and role. Opt-in, needs the `[snmp]` extra; `pysnmp` imported lazily and
+  degrades to a single note when absent.
+- ☑ OS fingerprint heuristics (TTL, banner, open-port profile) combined
+  most-trusted-first into an `os_fingerprint` guess that never overrides an
+  SSH/SNMP-derived OS.
+- ☑ Reverse-DNS and DHCP-lease hostname resolution (dnsmasq + ISC lease parsers),
+  neither overwriting a stronger source's name.
+- ☑ Tagging/classification rules: built-in heuristics (services + OS + SNMP + MAC
+  OUI vendor) assign role/tags without downgrading a proven role, plus declarative
+  user `rules` that run last and may override.
+- ☑ Unit tests for every pass (pure helpers tested directly; the network-touching
+  passes monkeypatch their single I/O function).
+
+**Exit criteria:** a scan over a mixed LAN names IP-only hosts, guesses their OS,
+and classes switches/NAS/printers by role + tags — visible in `list`, the D2 maps
+and the per-host Markdown.
 
 ---
 

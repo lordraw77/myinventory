@@ -103,6 +103,7 @@ class MarkdownRenderer:
             f"| Addresses | {', '.join(host.addresses) or '—'} |",
             f"| MAC | {host.mac or '—'} |",
             f"| Role | {host.role.value} |",
+            f"| Vendor | {host.extra.get('vendor') or '—'} |",
             f"| OS | {host.os or '—'} |",
             f"| Kernel | {host.extra.get('kernel_release') or '—'} |",
             f"| Arch | {host.extra.get('arch') or '—'} |",

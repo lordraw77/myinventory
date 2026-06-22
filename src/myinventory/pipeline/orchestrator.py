@@ -9,6 +9,8 @@ Stages, in order:
    SSH and inventory packages, processes, systemd units and containers.
 5. **Correlation** — link VMs to network-discovered hosts and to their
    hypervisor node.
+6. **Enrichment** — SNMP, reverse-DNS/DHCP hostnames, OS fingerprinting and
+   role/tag classification annotate the merged inventory in place.
 
 Every plugin call is wrapped so a failure becomes a recorded error instead of an
 aborted census.
@@ -21,6 +23,7 @@ from dataclasses import dataclass, field
 
 from ..config import AppConfig, HypervisorTarget, LinuxSshTarget, NetworkTarget
 from ..discovery import DiscoveryResult, get_discovery
+from ..enrich import ENRICHMENT_ORDER, get_enricher
 from ..models import Host, HostRole, Inventory, Network
 from ..services import get_probe
 from ..virtualization import BackendResult, get_backend
@@ -35,6 +38,7 @@ class ScanReport:
     vms_found: int = 0
     packages_found: int = 0
     containers_found: int = 0
+    enriched: int = 0
     errors: list[str] = field(default_factory=list)
 
     def __str__(self) -> str:
@@ -47,6 +51,8 @@ class ScanReport:
                 f", {self.packages_found} packages, "
                 f"{self.containers_found} containers"
             )
+        if self.enriched:
+            line += f", {self.enriched} enrichments"
         if self.errors:
             line += f" ({len(self.errors)} errors)"
         return line
@@ -65,6 +71,7 @@ class Orchestrator:
         self._collect_virtualization(inventory, report)
         self._inspect_linux(inventory, report)
         self._correlate(inventory)
+        self._enrich(inventory, report)
 
         report.hosts_found = len(inventory.hosts)
         report.services_found = sum(len(h.services) for h in inventory.hosts.values())
@@ -151,6 +158,26 @@ class Orchestrator:
             return None, [f"ssh/{target.host}: inspection failed: {exc}"]
         finally:
             transport.close()
+
+    # --- stage 6: enrichment ---------------------------------------------
+    def _enrich(self, inventory: Inventory, report: ScanReport) -> None:
+        cfg = self.config.enrichment
+        gates = {
+            "snmp": cfg.snmp.enabled,
+            "hostname": cfg.reverse_dns or bool(cfg.dhcp_leases),
+            "fingerprint": cfg.os_fingerprint,
+            "classify": cfg.classify,
+        }
+        for name in ENRICHMENT_ORDER:
+            if not gates.get(name):
+                continue
+            try:
+                result = get_enricher(name).enrich(inventory, cfg)
+            except Exception as exc:  # noqa: BLE001 - one bad pass must not abort
+                report.errors.append(f"enrich/{name}: {exc}")
+                continue
+            report.errors.extend(result.errors)
+            report.enriched += result.applied
 
     # --- stage 5: correlation --------------------------------------------
     @staticmethod

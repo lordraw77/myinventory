@@ -33,6 +33,9 @@ virt = [
 ssh = [
     "paramiko>=3.0",        # agentless service inspection over SSH
 ]
+snmp = [
+    "pysnmp>=5.0",          # SNMP system-group polling for appliances
+]
 dev = [
     "pytest>=7.4",
     "pytest-cov>=4.1",
@@ -40,7 +43,7 @@ dev = [
     "ruff>=0.1",
     "types-PyYAML",
 ]
-all = ["myinventory[scan,virt,ssh]"]
+all = ["myinventory[scan,virt,ssh,snmp]"]
 
 [project.scripts]
 myinventory = "myinventory.cli:main"

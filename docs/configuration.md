@@ -19,6 +19,8 @@ myinventory validate-config --config myinventory.yaml
 | `service_probes` | list | `[banner]` | Probes to run, in order. |
 | `networks` | list | `[]` | Subnets to scan (see below). |
 | `hypervisors` | list | `[]` | Hypervisors to enumerate VMs from. |
+| `linux_ssh` | list | `[]` | Linux hosts to deep-inspect over SSH. |
+| `enrichment` | map | *(on)* | Post-scan enrichment passes (see below). |
 
 ## `networks[]`
 
@@ -165,10 +167,63 @@ that need it (e.g. mapping every listening socket to its owning process). Prefer
 a key with passwordless, command-restricted sudo where you can — see
 [security.md](security.md).
 
+## `enrichment`
+
+After discovery, virtualization and correlation, a set of **enrichment** passes
+annotate the merged inventory in place — naming IP-only hosts, guessing each
+host's OS and assigning a role and descriptive tags. The cheap, dependency-free
+passes default **on**; SNMP is opt-in. See [enrichment.md](enrichment.md) for
+what each pass does.
+
+```yaml
+enrichment:
+  reverse_dns: true            # PTR lookups for IP-only hosts
+  os_fingerprint: true         # OS guess from TTL + banners + open ports
+  classify: true               # roles (nas/printer/network…) + tags
+  dhcp_leases:                 # client hostnames from a lease database
+    - /var/lib/misc/dnsmasq.leases
+  snmp:
+    enabled: true              # needs the [snmp] extra
+    community: env:SNMP_COMMUNITY   # default "public"; env:/file: refs accepted
+    version: "2c"              # "1" | "2c"
+    port: 161
+  rules:                       # user classification rules (run last)
+    - hostname_regex: "^cam-"
+      services: [rtsp]
+      role: network
+      tags: [camera, iot]
+```
+
+| Key | Type | Default | Meaning |
+|---|---|---|---|
+| `reverse_dns` | bool | `true` | Resolve PTR records for hosts with no name. |
+| `dhcp_leases` | list | `[]` | dnsmasq / ISC `dhcpd.leases` files to read hostnames from. |
+| `os_fingerprint` | bool | `true` | Heuristic OS guess (never overrides an SSH/SNMP OS). |
+| `classify` | bool | `true` | Assign a role and tags from services, OS, vendor. |
+| `snmp.enabled` | bool | `false` | Poll the SNMP `system` group (needs the `[snmp]` extra). |
+| `snmp.community` | str | `public` | Community string; accepts `env:`/`file:` refs. |
+| `snmp.version` | str | `2c` | `1` or `2c`. |
+| `snmp.port` / `timeout` / `retries` | | `161` / `1.0` / `1` | UDP tuning. |
+| `rules` | list | `[]` | Declarative classification rules (below). |
+
+**Classification rules** — each rule fires only when *every* condition it sets
+matches; the outcome assigns a `role` and/or appends `tags`. User rules run
+after the built-in heuristics and, being explicit, may override the role.
+
+| Field | Matches when |
+|---|---|
+| `ports` | any listed port is open on the host. |
+| `services` | any listed logical service name is present. |
+| `os_contains` | substring of the host's OS string (case-insensitive). |
+| `vendor_contains` | substring of the MAC-derived vendor. |
+| `hostname_regex` | regex search against the hostname. |
+| `role` / `tags` | outcome applied on a match. |
+
 ## Secrets
 
 Credentials are **never** written inline. Every secret field — `password`,
-`secret` and `sudo_password` — takes a *reference* that is resolved at run time:
+`secret`, `sudo_password` and the SNMP `community` — takes a *reference* that is
+resolved at run time:
 
 | Form | Resolves to |
 |---|---|

@@ -75,6 +75,59 @@ class LinuxSshTarget:
 
 
 @dataclass
+class SnmpConfig:
+    """SNMP polling settings for the enrichment stage.
+
+    Disabled by default: it needs the ``snmp`` extra and a community string.
+    ``community`` accepts an ``env:``/``file:`` reference like any other secret.
+    """
+
+    enabled: bool = False
+    community: str = "public"
+    version: str = "2c"  # "1" | "2c"
+    port: int = 161
+    timeout: float = 1.0
+    retries: int = 1
+
+
+@dataclass
+class ClassificationRule:
+    """A declarative user rule: when every set condition matches, apply outcome.
+
+    Conditions (all that are non-empty must hold): ``ports`` (any open),
+    ``services`` (any service name present), ``os_contains``, ``vendor_contains``
+    and ``hostname_regex``. Outcome assigns ``role`` and/or appends ``tags``.
+    User rules are explicit intent and override heuristic classification.
+    """
+
+    role: str | None = None
+    tags: list[str] = field(default_factory=list)
+    ports: list[int] = field(default_factory=list)
+    services: list[str] = field(default_factory=list)
+    os_contains: str | None = None
+    vendor_contains: str | None = None
+    hostname_regex: str | None = None
+
+
+@dataclass
+class EnrichmentConfig:
+    """Milestone-4 enrichment toggles.
+
+    The cheap, dependency-free passes (reverse DNS, OS fingerprint heuristics and
+    classification) default on; SNMP is opt-in.
+    """
+
+    reverse_dns: bool = True
+    #: Paths to DHCP lease files (dnsmasq or ISC ``dhcpd.leases``) to read
+    #: client-supplied hostnames from.
+    dhcp_leases: list[str] = field(default_factory=list)
+    os_fingerprint: bool = True
+    classify: bool = True
+    snmp: SnmpConfig = field(default_factory=SnmpConfig)
+    rules: list[ClassificationRule] = field(default_factory=list)
+
+
+@dataclass
 class AppConfig:
     """Top-level configuration."""
 
@@ -82,6 +135,7 @@ class AppConfig:
     hypervisors: list[HypervisorTarget] = field(default_factory=list)
     linux_ssh: list[LinuxSshTarget] = field(default_factory=list)
     service_probes: list[str] = field(default_factory=lambda: ["banner"])
+    enrichment: EnrichmentConfig = field(default_factory=EnrichmentConfig)
     workers: int = 64
     output_dir: str = "./out"
 
@@ -103,6 +157,7 @@ class AppConfig:
             hypervisors=hypervisors,
             linux_ssh=linux_ssh,
             service_probes=data.get("service_probes", ["banner"]),
+            enrichment=_enrichment(data.get("enrichment", {})),
             workers=int(data.get("workers", 64)),
             output_dir=data.get("output_dir", "./out"),
         )
@@ -156,6 +211,49 @@ def _linux_ssh(data: dict[str, Any]) -> LinuxSshTarget:
         port=int(data.get("port", 22)),
         name=data.get("name"),
         strict_host_key=bool(data.get("strict_host_key", True)),
+    )
+
+
+def _enrichment(data: dict[str, Any]) -> EnrichmentConfig:
+    if not isinstance(data, dict):
+        raise ConfigError("'enrichment' must be a mapping")
+    return EnrichmentConfig(
+        reverse_dns=bool(data.get("reverse_dns", True)),
+        dhcp_leases=list(data.get("dhcp_leases", [])),
+        os_fingerprint=bool(data.get("os_fingerprint", True)),
+        classify=bool(data.get("classify", True)),
+        snmp=_snmp(data.get("snmp", {})),
+        rules=[_rule(r) for r in data.get("rules", [])],
+    )
+
+
+def _snmp(data: dict[str, Any]) -> SnmpConfig:
+    if not isinstance(data, dict):
+        raise ConfigError("'enrichment.snmp' must be a mapping")
+    version = str(data.get("version", "2c"))
+    if version not in ("1", "2c"):
+        raise ConfigError(f"unsupported snmp version {version!r}; use '1' or '2c'")
+    return SnmpConfig(
+        enabled=bool(data.get("enabled", False)),
+        community=_resolve_secret(data.get("community")) or "public",
+        version=version,
+        port=int(data.get("port", 161)),
+        timeout=float(data.get("timeout", 1.0)),
+        retries=int(data.get("retries", 1)),
+    )
+
+
+def _rule(data: dict[str, Any]) -> ClassificationRule:
+    if not isinstance(data, dict):
+        raise ConfigError("each enrichment rule must be a mapping")
+    return ClassificationRule(
+        role=data.get("role"),
+        tags=list(data.get("tags", [])),
+        ports=[int(p) for p in data.get("ports", [])],
+        services=list(data.get("services", [])),
+        os_contains=data.get("os_contains"),
+        vendor_contains=data.get("vendor_contains"),
+        hostname_regex=data.get("hostname_regex"),
     )
 
 

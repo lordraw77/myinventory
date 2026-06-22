@@ -85,3 +85,38 @@ linux_ssh:
   #   username: ansible
   #   key_file: ~/.ssh/id_ed25519
   #   sudo: true
+
+# --- enrichment & accuracy (Milestone 4) -----------------------------------
+# Post-processing passes that run after discovery/virtualization/correlation and
+# annotate the merged inventory in place. The cheap, dependency-free passes
+# (reverse DNS, OS fingerprinting, classification) default ON; SNMP is opt-in.
+enrichment:
+  reverse_dns: true          # PTR lookups to name IP-only hosts
+  os_fingerprint: true       # guess OS from TTL + banners + open-port profile
+  classify: true             # assign roles (nas/printer/network…) and tags
+
+  # DHCP lease files to read client-supplied hostnames from (dnsmasq or ISC):
+  dhcp_leases: []
+  # dhcp_leases:
+  #   - /var/lib/misc/dnsmasq.leases
+  #   - /var/lib/dhcp/dhcpd.leases
+
+  # SNMP polling of the system group (needs the [snmp] extra). Off by default.
+  snmp:
+    enabled: false
+    community: env:SNMP_COMMUNITY   # or a file: ref; defaults to "public"
+    version: "2c"                   # "1" | "2c"
+    port: 161
+    timeout: 1.0
+    retries: 1
+
+  # User classification rules run after the built-in heuristics and, as explicit
+  # intent, may override the role. A rule fires when EVERY field it sets matches.
+  rules: []
+  # rules:
+  #   - hostname_regex: "^cam-"     # IP camera fleet
+  #     services: [rtsp]
+  #     role: network
+  #     tags: [camera, iot]
+  #   - vendor_contains: synology
+  #     role: nas
